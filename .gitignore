@@ -1,0 +1,15 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# IDEs / OS
+.idea/
+.vscode/
+.DS_Store
+
+# never commit packet captures (contain PII)
+*.pcap
+*.pcapng

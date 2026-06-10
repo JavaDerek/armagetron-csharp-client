@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Rule 1 + 5: netstandard2.1 + conservative C# so this compiles cleanly
+       inside both MonoGame and Unity (Mono / IL2CPP). No engine deps (rule 2). -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>Armagetron.Protocol</RootNamespace>
+    <AssemblyName>Armagetron.Protocol</AssemblyName>
+  </PropertyGroup>
+
+</Project>
