@@ -42,6 +42,21 @@ namespace Armagetron.Protocol.Tests
         }
 
         [Fact]
+        public void EncodeReproducesCapturedBodyExactly()
+        {
+            // Decode a real command, re-encode it, and require byte-identical output.
+            // (The custom-float encode is idempotent for values it produced, so a
+            //  command captured from the real client must round-trip exactly.)
+            NetMessage m = StreamCodec.Parse(Hex.Decode(Cmd1)).Messages[0];
+            CycleDestinationSync c = CycleDestinationSync.Decode(m);
+            Assert.Equal(Hex.Encode(m.Body), Hex.Encode(c.EncodeBody()));
+
+            // And the full outgoing message frames back to the exact captured packet.
+            var pkt = new Packet(new[] { c.ToMessage(m.MessageId) }, 0x0001);
+            Assert.Equal(Cmd1, Hex.Encode(StreamCodec.Serialize(pkt)));
+        }
+
+        [Fact]
         public void ConsecutiveCommandsAreContinuous()
         {
             var a = Cmd(Cmd1); // at (~90,54), heading +x

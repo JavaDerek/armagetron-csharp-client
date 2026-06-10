@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Core.Protocol\Core.Protocol.csproj" />
+  </ItemGroup>
+
+  <!-- Same engine-agnostic rules as Core.Protocol. System.Net.Sockets is part of
+       netstandard2.1, so the live transport stays portable; a front-end may still
+       swap in its own link via IUdpLink. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>Armagetron.Net</RootNamespace>
+    <AssemblyName>Armagetron.Net</AssemblyName>
+  </PropertyGroup>
+
+</Project>

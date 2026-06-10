@@ -39,6 +39,28 @@ namespace Armagetron.Protocol.Game
         public bool Braking => (Flags & 1) != 0;
         public bool Chatting => (Flags & 2) != 0;
 
+        /// <summary>Descriptor id this command is carried under (verified in capture).</summary>
+        public const int Descriptor = 321;
+
+        /// <summary>Encode just the message body (inverse of <see cref="Decode(MessageReader)"/>).</summary>
+        public byte[] EncodeBody()
+        {
+            var w = new MessageWriter();
+            w.WriteReal(Position.X);
+            w.WriteReal(Position.Y);
+            w.WriteReal(Direction.X);
+            w.WriteReal(Direction.Y);
+            w.WriteReal(Distance);
+            w.WriteUInt16(Flags);
+            w.WriteUInt16(CycleId);
+            w.WriteReal(GameTime);
+            w.WriteUInt16(Turns);
+            return w.ToArray();
+        }
+
+        /// <summary>Build a full <see cref="NetMessage"/> for sending, with the given reliable message id.</summary>
+        public NetMessage ToMessage(int messageId) => new NetMessage(Descriptor, messageId, EncodeBody());
+
         public static CycleDestinationSync Decode(NetMessage msg) => Decode(msg.Reader());
 
         public static CycleDestinationSync Decode(MessageReader r)

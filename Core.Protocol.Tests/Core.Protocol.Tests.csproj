@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Core.Protocol\Core.Protocol.csproj" />
+    <ProjectReference Include="..\Core.Net\Core.Net.csproj" />
   </ItemGroup>
 
 </Project>
