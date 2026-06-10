@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core.Protocol.Tests", "Core
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core.Net", "Core.Net\Core.Net.csproj", "{1490536F-716E-46E9-A094-766CC45E4B69}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bot.Console", "Bot.Console\Bot.Console.csproj", "{7B58D5D1-03B6-4BD9-AD9E-FD317F36B22D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -55,6 +57,18 @@ Global
 		{1490536F-716E-46E9-A094-766CC45E4B69}.Release|x64.Build.0 = Release|Any CPU
 		{1490536F-716E-46E9-A094-766CC45E4B69}.Release|x86.ActiveCfg = Release|Any CPU
 		{1490536F-716E-46E9-A094-766CC45E4B69}.Release|x86.Build.0 = Release|Any CPU
+		{7B58D5D1-03B6-4BD9-AD9E-FD317F36B22D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7B58D5D1-03B6-4BD9-AD9E-FD317F36B22D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7B58D5D1-03B6-4BD9-AD9E-FD317F36B22D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7B58D5D1-03B6-4BD9-AD9E-FD317F36B22D}.Debug|x64.Build.0 = Debug|Any CPU
+		{7B58D5D1-03B6-4BD9-AD9E-FD317F36B22D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7B58D5D1-03B6-4BD9-AD9E-FD317F36B22D}.Debug|x86.Build.0 = Debug|Any CPU
+		{7B58D5D1-03B6-4BD9-AD9E-FD317F36B22D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7B58D5D1-03B6-4BD9-AD9E-FD317F36B22D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7B58D5D1-03B6-4BD9-AD9E-FD317F36B22D}.Release|x64.ActiveCfg = Release|Any CPU
+		{7B58D5D1-03B6-4BD9-AD9E-FD317F36B22D}.Release|x64.Build.0 = Release|Any CPU
+		{7B58D5D1-03B6-4BD9-AD9E-FD317F36B22D}.Release|x86.ActiveCfg = Release|Any CPU
+		{7B58D5D1-03B6-4BD9-AD9E-FD317F36B22D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
