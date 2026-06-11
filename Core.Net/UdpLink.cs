@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 
@@ -7,7 +8,10 @@ namespace Armagetron.Net
     /// Live UDP transport over <see cref="UdpClient"/> (works on desktop, Android,
     /// iOS via Mono/.NET). Not unit-tested — exercised by the bot against a real
     /// listen server. A front-end may substitute its own <see cref="IUdpLink"/>.
+    /// Excluded from coverage: this is the raw socket I/O boundary, verified by the
+    /// live-server gate (step 4 of the TDD loop in CLAUDE.md), not by unit tests.
     /// </summary>
+    [ExcludeFromCodeCoverage]
     public sealed class UdpLink : IUdpLink
     {
         private readonly UdpClient _client;

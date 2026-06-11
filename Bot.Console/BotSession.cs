@@ -341,29 +341,36 @@ namespace Armagetron.Bot
                     }
                 }
             }
-            else if (msg.DataLengthWords >= 10)
+            else if (CycleStateSync.TryDecodeFull(msg, out var sync))
             {
-                // Full cycle position sync: [0]=cycle_id [1-2]=game_time [3-4]=dir_x [5-6]=dir_y [7-8]=pos_x [9-10]=pos_y
-                var r = msg.Reader();
-                int cid = r.ReadUInt16();
-                float gt = r.ReadReal();
-                float dx = r.ReadReal();
-                float dy = r.ReadReal();
-                float px = r.ReadReal();
-                float py = r.ReadReal();
-                bool ours = (cid == _myCycleId && _myCycleId >= 0);
-                Log($"  desc=24 {msg.DataLengthWords}w cid={cid}{(ours ? " ★OUR" : "")} pos=({px:0.##},{py:0.##}) dir=({dx:0.##},{dy:0.##}) gt={gt:0.###}");
+                // A genuine 27-word gCycle position sync. desc=24 is the generic
+                // nNetObject sync: shorter ≥10w variants are player/team objects
+                // (they carry names), and decoding those as positions seeds garbage.
+                // Only this full cycle sync may set our spawn position.
+                bool ours = (sync.CycleId == _myCycleId && _myCycleId >= 0);
+                Log($"  desc=24 27w cid={sync.CycleId}{(ours ? " ★OUR" : "")} " +
+                    $"pos=({sync.Position.X:0.##},{sync.Position.Y:0.##}) " +
+                    $"dir=({sync.Direction.X:0.##},{sync.Direction.Y:0.##}) gt={sync.GameTime:0.###}");
                 if (ours && !_posInitialized)
                 {
-                    _dir = new Vec2(dx, dy);
-                    _pos = new Vec2(px, py);
+                    _dir = sync.Direction;
+                    _pos = sync.Position;
                     _dist = 0f;
-                    _gameTime = gt;
+                    _gameTime = sync.GameTime;
                     _posInitialized = true;
                     _lastMoveTick = Tick();
                     _lastTurnTick = Tick();
-                    Log($"★ Spawn pos from desc=24 27w: pos=({px:0.##},{py:0.##}) dir=({dx:0.##},{dy:0.##}) gt={gt:0.###}");
+                    Log($"★ Spawn pos from desc=24 27w: pos=({_pos.X:0.##},{_pos.Y:0.##}) " +
+                        $"dir=({_dir.X:0.##},{_dir.Y:0.##}) gt={_gameTime:0.###}");
                 }
+            }
+            else if (msg.DataLengthWords >= 10 && msg.Reader().ReadUInt16() == _myCycleId && _myCycleId >= 0)
+            {
+                // A ≥10w desc=24 carrying OUR cycle id but NOT the 27w full form —
+                // an as-yet-undecoded gCycle sync variant (19/24/29w seen on the wire).
+                // Do NOT seed position from it; dump raw words so a live capture can
+                // reveal the short-variant layout (CLAUDE.md TDD step: gather vectors).
+                LogBody($"desc=24 {msg.DataLengthWords}w UNCHARTED our-cycle sync (not seeding)", msg);
             }
             else
             {
