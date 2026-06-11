@@ -12,9 +12,10 @@ namespace Armagetron.Net
     ///         acked themselves.</item>
     ///   <item>On receiving a reliable message (id != 0), the peer sends a desc-1
     ///         Ack listing that id.</item>
-    ///   <item>Every packet ends with a 2-byte trailer. Observed: 0 during the
-    ///         pre-login handshake, then a small constant once logged in — looks
-    ///         like a connection/sender id. <b>[?] exact semantics confirmed live.</b></item>
+    ///   <item>Every packet ends with a 2-byte trailer = sender's <b>player_id</b>.
+    ///         Pre-login: 0. Post-login: the player_id from desc=5 LoginAccepted.
+    ///         Server uses this to route acks to the correct session across NAT.
+    ///         (Source: fifi.org Armagetron Layer 2 docs.)</item>
     /// </list>
     /// This class is transport-agnostic (no socket) so it can be unit-tested.
     /// </summary>
@@ -77,17 +78,25 @@ namespace Armagetron.Net
 
         /// <summary>
         /// If anything is awaiting acknowledgement, produce an Ack packet and clear
+        /// the queue; otherwise (null, null).
+        /// </summary>
+        public (byte[]? packet, IReadOnlyList<int>? ids) DrainAckPacketWithIds()
+        {
+            if (_pendingAcks.Count == 0) return (null, null);
+            var ids = new List<int>(_pendingAcks);
+            var ack = BuildAck(_pendingAcks);
+            _pendingAcks.Clear();
+            return (Assemble(new[] { ack }), ids);
+        }
+
+        /// <summary>
+        /// If anything is awaiting acknowledgement, produce an Ack packet and clear
         /// the queue; otherwise null.
         /// </summary>
         public byte[]? DrainAckPacket()
         {
-            if (_pendingAcks.Count == 0)
-            {
-                return null;
-            }
-            var ack = BuildAck(_pendingAcks);
-            _pendingAcks.Clear();
-            return Assemble(new[] { ack });
+            var (pkt, _) = DrainAckPacketWithIds();
+            return pkt;
         }
     }
 }
