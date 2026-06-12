@@ -97,10 +97,11 @@ A REAL occupies 2 words (4 bytes) on the wire.
 
 | Desc | Direction | Name              | Notes |
 |------|-----------|-------------------|-------|
-| 310  | S→C       | CycleAlive        | Body: u16 cycle_id. Server tells client its own cycle has spawned. |
-| 220  | S→C       | CycleCreate       | Full cycle description for another player's cycle (name, color, position, etc.). |
+| 310  | S→C       | GameSync          | nNOInitialisator for **gGame**. word[0] = gGame netobj_id (typically 5). **NOT** a cycle message. The gGame object sends compact desc=24 2w packets with GS_ state transitions (GS_TRANSFER_SETTINGS=7, GS_PLAY=50, GS_DELETE_OBJECTS=60). Record word[0] as `_gameNetObjId` to match round-start triggers. Source: GPL nNOInitialisator<gGame> game_init(310,"game"), confirmed by desc=310 body word[0]=5 seen live. |
+| 320  | S→C       | CycleCreate       | nNOInitialisator for **gCycle**. **Authoritative source for our gCycle id.** Wire layout: `[0] cycle_id u16`, `[1] connectionSlot u16` (0=AI/server, 1=first remote client), `[2] playerNetObjId u16`, `[3+] further sync data`. Identify our cycle by connectionSlot == session.ConnectionId (=1). Source: GPL nNOInitialisator<gCycle> cycle_init(320,"cycle"), confirmed live by desc=320 w1=0x0001 matching our slot. |
+| 220  | S→C       | TeamCreate        | nNOInitialisator for **eTeam**. When word[5+] carries a player name, the team's name is the player's name (1-player teams). NOT a cycle message. Wire layout (15w observed): `[0] netObjId u16`, `[1-4] unknown`, `[5+] name string (AA-encoded, optional)`. Source: GPL nNOInitialisator<eTeam> eTeam_init(220,"eTeam"). |
 | 321  | C→S       | CycleDestinationSync | 15-word turn/position command (see below). |
-| 24   | S→C       | CycleStatus       | 2-word compact: `[cycle_id u16][value u16]` where value=7 signals rubber reset / new round. 27-word full spawn sync (see below). |
+| 24   | S→C       | NetSync           | Generic nNetObject sync (net_sync). 2-word compact: `[netobj_id u16][value u16]` — for gGame objects, value is a GS_ state transition (7=GS_TRANSFER_SETTINGS=round start, 50=GS_PLAY, 60=GS_DELETE_OBJECTS). 27-word full spawn sync for gCycle objects (see below). |
 
 ### netObject sync (RESOLVED)
 
@@ -131,7 +132,7 @@ confirmed by matching desc=24 27w word[0]=151 with desc=321 word[11]=151.
 [6-7]   dir_y        REAL    (unit axis)
 [8-9]   distance     REAL    (total distance traveled from spawn, starts at 0)
 [10]    flags        u16     (bit0=brake, bit1=chat)
-[11]    cycle_id     u16     (current round's cycle netobj_id from desc=220/desc=310)
+[11]    cycle_id     u16     (gCycle netobj_id — same value as desc=320 word[0])
 [12-13] game_time    REAL    (current game clock, monotonically increasing from spawn)
 [14]    turns        u16     (turn counter, increments each time client sends a turn)
 ```
@@ -145,18 +146,20 @@ position discrepancy of billions of units → immediate cheating detection + dis
 ## Round lifecycle (observed sequence)
 
 ```
+S→C  desc=310  (gGame create — word[0]=gameNetObjId; record for round-start triggers)
+S→C  desc=320  (gCycle create — word[0]=cycle_id, word[1]=connectionSlot; our cycle has slot=1)
+S→C  desc=24 27w (spawn position sync for our cycle — seed spawn pos from here)
 S→C  desc=8    (round announcement "Go round N of M")
-S→C  desc=310  (CycleAlive — our cycle spawned, gives cycle_id)
 S→C  desc=28   (timer sync — REAL_0 = spawn game_time)
 ...  [game runs] ...
-S→C  desc=24   (2w compact, value=7 for our cycle → rubber reset = new round start)
+S→C  desc=24 2w (gGame compact sync, netobj_id=gameNetObjId, value=7=GS_TRANSFER_SETTINGS → new round start)
 S→C  desc=9    (round end)
 C→S  desc=21   (ready frame 0 — request next spawn)
 C→S  desc=25   (ready frame 1)
 C→S  desc=28   (timer sync acknowledgment? exact semantics TBD)
 ```
 
-**Observed:** After round 1, the server does NOT send a new desc=310. It reuses the same cycle_id across rounds. Rubber reset to 7 (via 2-word desc=24) signals the new round's respawn.
+**Observed:** desc=310 and desc=320 are sent once at session start (first spawn). The gGame broadcasts compact desc=24 2w with value=GS_TRANSFER_SETTINGS=7 to signal the start of each new round. The gCycle id from desc=320 remains valid across rounds (server reuses it).
 
 ---
 
@@ -264,8 +267,9 @@ Real client C→S descriptors observed (from PCAP, not all currently implemented
 | Value      | Meaning |
 |------------|---------|
 | 0x0097 (151) | cycle_id used in real-client desc=321 word [11] for a specific capture round |
-| 0x0007     | rubber value at fresh spawn (in 2-word desc=24) |
-| 0x0032 (50)| max rubber (from desc=310 body; cycle dies when rubber used = 50) |
+| 0x0007 (7) | GS_TRANSFER_SETTINGS — gGame state value that signals round start (in 2-word desc=24) |
+| 0x0032 (50)| GS_PLAY — gGame state value during active gameplay |
+| 0x003C (60)| GS_DELETE_OBJECTS — gGame state value at round/session cleanup |
 | ~28-30     | CYCLE_SPEED estimate (units/sec); 36.393 units / 1.279s ≈ 28.5 |
 
 ## Open questions (priority order)

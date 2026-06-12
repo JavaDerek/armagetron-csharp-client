@@ -29,7 +29,8 @@ namespace Armagetron.Bot
         private const int DescKeepalive        = 27; // S→C  [0000] heartbeat (reliable)
         private const int DescNetObjectSync    = 60; // S→C  nNetObject sync
         private const int DescCycleSync        = 300; // S→C  cycle position sync
-        private const int DescCycleAlive       = 310; // S→C  cycle alive (spawn)
+        private const int DescGameSync         = 310; // S→C  gGame create/sync (GS_ state transitions)
+        private const int DescCycleCreate      = 320; // S→C  gCycle create (gives us our cycle id)
         private const int DescCycleTurn        = 321; // C→S  CycleDestinationSync
 
         // ── State machine ─────────────────────────────────────────────────────
@@ -54,7 +55,8 @@ namespace Armagetron.Bot
         private const int MaxPollRetries = 30;
 
         // Turn state
-        private int _myCycleId = -1;
+        private int _myCycleId    = -1;  // gCycle netobj_id (set from desc=320 when slot==ours)
+        private int _gameNetObjId = -1;  // gGame netobj_id (set from desc=310; used for round-start trigger)
         private Vec2 _pos      = new Vec2(0, 0);
         private Vec2 _dir      = new Vec2(1, 0);
         private float _dist    = 0f;
@@ -119,11 +121,10 @@ namespace Armagetron.Bot
                 else
                     HandleIdle();
 
-                if (_state == State.Playing)
-                {
-                    MaybeSpeedSync();
-                    MaybeSendTurn();
-                }
+                // Run speed-sync priming whenever it is in progress (may start in Connected state
+                // before desc=320 has arrived). Only send turns once in Playing state.
+                if (_speedSyncStep >= 0) MaybeSpeedSync();
+                if (_state == State.Playing) MaybeSendTurn();
             }
         }
 
@@ -190,8 +191,12 @@ namespace Armagetron.Bot
                     OnReservedIdReply(msg);
                     break;
 
-                case DescCycleAlive:         // desc=310: server spawned a cycle
-                    OnCycleAlive(msg);
+                case DescGameSync:           // desc=310: gGame create/sync (GS_ state transitions)
+                    OnGameStateSync(msg);
+                    break;
+
+                case DescCycleCreate:        // desc=320: gCycle creation — identifies our cycle
+                    OnCycleCreate(msg);
                     break;
 
                 case 220:
@@ -316,9 +321,12 @@ namespace Armagetron.Bot
                 int value = r.ReadUInt16();
                 Log($"  desc=24 compact cycle={cid} value={value}");
 
-                if (cid == _myCycleId && _myCycleId >= 0 && value == 7 && _state == State.Playing)
+                if (cid == _gameNetObjId && _gameNetObjId >= 0 && value == 7 &&
+                    (_state == State.Playing || _state == State.Connected))
                 {
-                    // Rubber reset to 7 == server started a new round with our cycle.
+                    // GS_TRANSFER_SETTINGS (7) on the gGame netobj == server starting a new round.
+                    // Fire in both Connected and Playing: in Connected we haven't registered yet
+                    // and need this trigger to start desc=311 priming → desc=201 → desc=320.
                     // Clear position state and wait for desc=24 27w to give us the real spawn coords.
                     _dist          = 0f;
                     _gameTime      = 0f;
@@ -487,57 +495,66 @@ namespace Armagetron.Bot
             return id;
         }
 
-        private void OnCycleAlive(NetMessage msg)
+        // desc=310 = nNOInitialisator<gGame>. Word[0] is the gGame's server-assigned netobj_id.
+        // The gGame sends compact desc=24 2w packets to broadcast GS_ state transitions
+        // (GS_TRANSFER_SETTINGS=7, GS_PLAY=50, GS_DELETE_OBJECTS=60). We record its netobj_id
+        // here so the round-start trigger in OnDesc24 can match cid==_gameNetObjId correctly.
+        // This is NOT a gCycle message — do not set _myCycleId here.
+        private void OnGameStateSync(NetMessage msg)
         {
-            if (msg.DataLengthWords >= 1)
+            if (msg.DataLengthWords < 1)
             {
-                LogBody("desc=310 (CycleAlive) raw", msg);
-                int cycleId = msg.Reader().ReadUInt16();
-                if (_myCycleId < 0)
-                {
-                    _myCycleId = cycleId;
-                    _turns = 0;
-                    _gameTime = 0f;
-                    _spawnGameTime = 0f;
-                    _dist = 0f;
-                    _pos = new Vec2(0, 0);   // placeholder — overwritten by desc=24 27w
-                    _dir = new Vec2(1, 0);
-                    _posInitialized = false; // hold desc=321 until desc=24 27w gives real spawn pos
-                    _lastMoveTick = Tick();
-                    _lastTurnTick = Tick();  // delay first turn by TurnIntervalMs
-                    Log($"★ Cycle spawned: cycle_id={cycleId}  → State.Playing (waiting for spawn pos)");
-                    _state = State.Playing;
-                    // desc=201 will be sent at the next round-start rubber reset (desc=24 2w value=7),
-                    // NOT here mid-round. Sending desc=201 mid-round means the gCycle has been
-                    // running for hundreds of ms with no client position reports, causing the
-                    // server's velocity check to compute infinite speed → cheating.
-                }
+                LogBody("desc=310 (gGame) too short", msg);
+                return;
             }
+            int gameId = msg.Reader().ReadUInt16();
+            _gameNetObjId = gameId;
+            LogBody($"desc=310 (gGame) netobj={gameId}", msg);
+        }
+
+        // desc=320 = nNOInitialisator<gCycle>. This is the authoritative source of our gCycle id.
+        // word[1] = connectionSlot: 1 for the first remote client (us), 0 for server/AI cycles.
+        // We set _myCycleId only for our own cycle and transition to State.Playing.
+        private void OnCycleCreate(NetMessage msg)
+        {
+            if (!CycleCreateMessage.TryDecode(msg, out var cc))
+            {
+                LogBody("desc=320 (gCycle) undecodeable", msg);
+                return;
+            }
+            bool ours = cc.ConnectionSlot == _session.ConnectionId;
+            Log($"  desc=320 (gCycle) cycleId={cc.CycleId} slot={cc.ConnectionSlot} player={cc.PlayerNetObjId}{(ours ? " ★OURS" : "")}");
+            if (!ours) return;
+
+            _myCycleId = cc.CycleId;
+            _turns = 0;
+            _gameTime = 0f;
+            _spawnGameTime = 0f;
+            _dist = 0f;
+            _pos = new Vec2(0, 0);   // placeholder — overwritten by desc=24 27w
+            _dir = new Vec2(1, 0);
+            _posInitialized = false; // hold desc=321 until desc=24 27w gives real spawn pos
+            _lastMoveTick = Tick();
+            _lastTurnTick = Tick();  // delay first turn by TurnIntervalMs
+            Log($"★ Our gCycle identified: cycle_id={_myCycleId}  → State.Playing (waiting for spawn pos)");
+            _state = State.Playing;
+            // desc=201 will be sent at the next round-start rubber reset (desc=24 2w GS_TRANSFER_SETTINGS=7),
+            // NOT here mid-round. Sending desc=201 mid-round means the gCycle has been running
+            // for hundreds of ms with no client position reports → velocity check → cheating.
         }
 
         private void OnDesc220(NetMessage msg)
         {
-            if (msg.DataLengthWords >= 8)
+            if (!Desc220Message.TryDecode(msg, out var payload))
             {
-                var r = msg.Reader();
-                int newCycleId = r.ReadUInt16();       // word[0]: cycle netobj_id
-                r.ReadUInt16(); r.ReadUInt16();         // skip word[1], word[2]
-                r.ReadUInt16(); r.ReadUInt16();         // skip word[3], word[4]
-                string cycleName = r.ReadString();      // word[5]: length-prefixed name
-                Log($"  desc=220 (CycleCreate) cycle_id={newCycleId} name='{cycleName}'");
-
-                // If the server created a cycle with OUR name after we sent desc=201,
-                // this is our new cycle. Update _myCycleId so desc=321 uses the right ID.
-                if (_playerObjectSent && cycleName == _name && _state == State.Playing)
-                {
-                    Log($"  ★ desc=220 OUR cycle! Updating _myCycleId: {_myCycleId} → {newCycleId}");
-                    _myCycleId = newCycleId;
-                }
+                LogBody("desc=220 (undecodeable)", msg);
+                return;
             }
-            else
-            {
-                LogBody("desc=220 (short?)", msg);
-            }
+            // desc=220 with a player name is an ePlayerNetID object, NOT our gCycle.
+            // Our gCycle id is set authoritatively by desc=310 (CycleAlive). Never
+            // update _myCycleId here — doing so would overwrite the correct value.
+            string nameTag = payload.HasName ? $" name='{payload.Name}'" : "";
+            Log($"  desc=220 netobj={payload.NetObjId}{nameTag} ({msg.DataLengthWords}w)");
         }
 
         // ── Outgoing messages ─────────────────────────────────────────────────
