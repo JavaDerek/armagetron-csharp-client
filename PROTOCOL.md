@@ -175,9 +175,36 @@ The bot reads this to get the real spawn position before sending the first desc=
 [5-6]   dir_y       REAL    (current direction y component)
 [7-8]   pos_x       REAL    (current position x)
 [9-10]  pos_y       REAL    (current position y)
-[11-12] ?           REAL    (≈20.0 at spawn, increases — possibly CYCLE_SPEED or boost)
-[13+]   ...                 (additional state fields not yet decoded)
+[11-12] speed       REAL    (current cycle speed, units/sec; ≈20 at spawn, cruises 28-33)
+[13]    alive       u16     (1 = alive, 0 = dead — see "death mechanic" below)
+[14-15] distance    REAL    (total distance from spawn; distance/game_time ≈ speed)
+[16]    ?           u16     (0 in all observed syncs)
+[17]    ?           u16     (small counter, increments through the round — turn/sync seq)
+[18]    ?           u16     (0 in all observed syncs)
+[19-22] last_pos    2×REAL  (position anchor; byte-identical to pos_x/pos_y [7-10]
+                             immediately after a turn — likely the last-turn coordinate)
+[23]    ?           u16     (0 for some cycles, a decreasing value for others — rubber?;
+                             becomes nonzero on the death sync)
+[24-26] sentinel            (ffff 0000 ffff in every observed sync)
 ```
+
+**Death mechanic (live-verified 2026-06-13, listen server 192.168.68.61:4534).**
+A dying cycle is announced **in-band**: the server sends one final desc=24 27w sync with
+**word [13] = 0** (the alive flag), then stops syncing that cycle entirely. The flag is the
+authoritative death signal — `1` in all 217 alive syncs captured, `0` in exactly the 9
+final-syncs of the 9 deaths observed (5 isolated mid-round AI deaths + our own cycle +
+round survivors). **Speed does NOT drop to 0 on death** — AI cycles crash into walls at
+full cruise (~30), so the death sync still reports speed≈30. A speed-threshold freeze would
+miss every wall-crash death; the alive flag is the correct trigger.
+
+Death-sync example (cid=1780, isolated mid-round death):
+```
+alive: speed=30.00 w13=1 dist=58.14  raw=[fe50 15df 0001 1bde 19d1 0000 0001 0000 32b4 213e 9fdc 1d68 0000 ffff 0000 ffff]
+DEAD:  speed=30.01 w13=0 dist=72.48  raw=[3792 15e0 0000 ea06 1d21 0000 0001 0000 32b4 213e 9fdc 1d68 e8b9 ffff 0000 ffff]
+```
+Render consequence: on an `alive=0` sync, freeze the remote cycle's dead-reckoning at its
+last position so it stops at the wall instead of ghosting through it. This replaces the
+interim 0.15 s extrapolation cap as the death fix.
 
 **Spawn position source:** The bot waits for a desc=24 27w matching its cycle_id before
 sending any desc=321. This guarantees the position reported to the server matches the
@@ -270,17 +297,18 @@ Real client C→S descriptors observed (from PCAP, not all currently implemented
 | 0x0007 (7) | GS_TRANSFER_SETTINGS — gGame state value that signals round start (in 2-word desc=24) |
 | 0x0032 (50)| GS_PLAY — gGame state value during active gameplay |
 | 0x003C (60)| GS_DELETE_OBJECTS — gGame state value at round/session cleanup |
-| ~28-30     | CYCLE_SPEED estimate (units/sec); 36.393 units / 1.279s ≈ 28.5 |
+| ~28-30     | CYCLE_SPEED (units/sec); now read directly from desc=24 27w word [11-12] |
 
 ## Open questions (priority order)
 
 1. **nNetObject ack format** — descriptor + body to acknowledge receiving a netobject sync
 2. **desc=51 blob decode** — extract arena size and spawn-slot algorithm
-3. **desc=24 27w words [11-26]** — fields after pos_y (rubber, speed, wall state, etc.)
+3. ~~**desc=24 27w words [11-26]**~~ — RESOLVED 2026-06-13: [11-12]=speed, **[13]=alive
+   flag (death signal)**, [14-15]=distance; [16-26] partially decoded (see layout above).
 4. **desc=28 C→S format** — what body does the client send when it echoes desc=28 back?
 5. **desc=3 format** — appears as mid=0 unreliable messages, body starts with netobj ID
 6. **Correct chat descriptor** — desc=8 C→S didn't produce visible chat
 
 ---
 
-*Last updated: 2026-06-10. Protocol version: Armagetron Advanced 0.2.9.3.0.*
+*Last updated: 2026-06-13. Protocol version: Armagetron Advanced 0.2.9.3.0.*

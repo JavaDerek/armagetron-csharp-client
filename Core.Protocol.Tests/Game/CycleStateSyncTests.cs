@@ -77,5 +77,50 @@ namespace Armagetron.Protocol.Tests
             var notSync = new NetMessage(310, 3, body);
             Assert.False(CycleStateSync.TryDecodeFull(notSync, out _));
         }
+
+        // ── Trailing state: speed (words [11-12]) and the alive flag (word [13]) ──
+        // Decoded from the same real captures. Words [11-26] were reverse-engineered
+        // live against 0.2.9.3.0 (192.168.68.61:4534, 2026-06-13); see PROTOCOL.md
+        // "desc=24 27-word cycle position sync".
+
+        [Fact]
+        public void DecodesSpeed_FromTrailingWords()
+        {
+            Assert.True(CycleStateSync.TryDecodeFull(Msg(FullHeadingX), out var a));
+            Near(27.771f, a.Speed, 0.01f);   // cruise speed, words [11-12]
+            Assert.True(CycleStateSync.TryDecodeFull(Msg(FullHeadingNegY), out var b));
+            Near(29.170f, b.Speed, 0.01f);
+        }
+
+        [Fact]
+        public void AliveFlag_IsTrue_OnLivingCycleSyncs()
+        {
+            // word [13] = 1 in every sync from a living cycle (217/217 in the capture).
+            Assert.True(CycleStateSync.TryDecodeFull(Msg(FullHeadingX), out var a));
+            Assert.True(a.Alive);
+            Assert.True(CycleStateSync.TryDecodeFull(Msg(FullHeadingNegY), out var b));
+            Assert.True(b.Alive);
+        }
+
+        [Fact]
+        public void AliveFlag_IsFalse_OnDeathSync()
+        {
+            // The death mechanic: the server sends one final 27w sync with word [13]=0,
+            // then stops syncing the cycle. Speed does NOT drop (cycles crash at full
+            // cruise), so the alive flag — not speed — is the death signal. We isolate
+            // that single bit by flipping word [13] of a real living-cycle body to 0;
+            // every other field stays genuine capture bytes.
+            byte[] body = Msg(FullHeadingX).Body;
+            const int aliveWord = 13;
+            body[aliveWord * 2] = 0x00;     // big-endian high byte
+            body[aliveWord * 2 + 1] = 0x00; // low byte → word = 0
+            var dead = new NetMessage(CycleStateSync.Descriptor, 3, body);
+
+            Assert.True(CycleStateSync.TryDecodeFull(dead, out var s));
+            Assert.False(s.Alive);
+            // Position/speed still decode normally on the death sync.
+            Near(17.963f, s.Position.X, 0.01f);
+            Near(27.771f, s.Speed, 0.01f);
+        }
     }
 }

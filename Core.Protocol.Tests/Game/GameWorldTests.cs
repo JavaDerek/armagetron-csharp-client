@@ -198,6 +198,50 @@ namespace Armagetron.Protocol.Tests.Game
             Assert.Equal(3f, snap.Position.Y, 3);
         }
 
+        // ── Death: a dead cycle freezes instead of ghosting through walls ─────
+
+        [Fact]
+        public void RemoteCycle_DeadSync_FreezesHead_NoExtrapolation()
+        {
+            // The headline fix: on an alive=false sync (the cycle crashed), the head
+            // must stop at the death position and NOT dead-reckon forward — otherwise
+            // it coasts straight through the wall it just hit.
+            var w = NewWorldOwning(5);
+            w.UpdateRemoteCycle(9, new Vec2(0, 0), new Vec2(1, 0), nowMs: 1000, alive: true, speed: 30f);
+            // The cycle hits a wall at (50,0) and the server sends its final sync, alive=0.
+            w.UpdateRemoteCycle(9, new Vec2(50, 0), new Vec2(1, 0), nowMs: 2000, alive: false, speed: 30f);
+
+            // A full second later: a living cycle would have coasted to the cap; a dead
+            // one stays exactly at the wall.
+            var snap = SnapOf(w.Snapshot(nowMs: 3000), 9);
+            Assert.Equal(new Vec2(50, 0), snap.Position);
+        }
+
+        [Fact]
+        public void RemoteCycle_DeadSync_KeepsTrail()
+        {
+            // The dead cycle's wall (trail) must remain rendered — only the head freezes.
+            var w = NewWorldOwning(5);
+            w.UpdateRemoteCycle(9, new Vec2(0, 0), new Vec2(1, 0), nowMs: 1000, alive: true, speed: 30f);
+            w.UpdateRemoteCycle(9, new Vec2(50, 0), new Vec2(1, 0), nowMs: 2000, alive: false, speed: 30f);
+
+            var snap = SnapOf(w.Snapshot(nowMs: 2000), 9);
+            Assert.NotEmpty(snap.Trail);
+            Assert.Equal(new Vec2(0, 0), snap.Trail[0]); // spawn waypoint preserved
+        }
+
+        [Fact]
+        public void RemoteCycle_ExtrapolatesAtReportedSpeed_NotHardcoded()
+        {
+            // Speed now comes from the sync (word [11-12]) rather than a fixed constant,
+            // so dead-reckoning tracks the cycle's actual speed.
+            var w = NewWorldOwning(5);
+            w.UpdateRemoteCycle(9, new Vec2(0, 0), new Vec2(1, 0), nowMs: 1000, alive: true, speed: 40f);
+
+            var snap = SnapOf(w.Snapshot(nowMs: 1100), 9); // 0.1s at 40 u/s → 4.0
+            Assert.Equal(4f, snap.Position.X, 3);
+        }
+
         [Fact]
         public void LocalCycle_IsNotDeadReckonedBySnapshot()
         {

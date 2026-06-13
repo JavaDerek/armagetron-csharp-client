@@ -99,7 +99,11 @@ namespace Armagetron.Net
         protected abstract void MaybeSendCycleCommand();
 
         /// Called when the server sends a 27-word position sync for any cycle.
-        protected virtual void OnCyclePositionUpdate(int cycleId, Vec2 pos, Vec2 dir) { }
+        /// <paramref name="alive"/> is the gCycle alive flag (word [13]); false on the
+        /// cycle's final death sync. <paramref name="speed"/> is its reported speed
+        /// (words [11-12]), for dead-reckoning.
+        protected virtual void OnCyclePositionUpdate(int cycleId, Vec2 pos, Vec2 dir,
+                                                      bool alive, float speed) { }
 
         /// Called when desc=320 identifies our gCycle (before Playing state is set).
         protected virtual void OnMyCycleCreated(int cycleId) { }
@@ -345,9 +349,10 @@ namespace Armagetron.Net
                 bool ours = sync.CycleId == _myCycleId && _myCycleId >= 0;
                 Log($"  desc=24 27w cid={sync.CycleId}{(ours ? " ★OUR" : "")} " +
                     $"pos=({sync.Position.X:0.##},{sync.Position.Y:0.##}) " +
-                    $"dir=({sync.Direction.X:0.##},{sync.Direction.Y:0.##}) gt={sync.GameTime:0.###}");
+                    $"dir=({sync.Direction.X:0.##},{sync.Direction.Y:0.##}) gt={sync.GameTime:0.###} " +
+                    $"speed={sync.Speed:0.##}{(sync.Alive ? "" : " ☠DEAD")}");
 
-                OnCyclePositionUpdate(sync.CycleId, sync.Position, sync.Direction);
+                OnCyclePositionUpdate(sync.CycleId, sync.Position, sync.Direction, sync.Alive, sync.Speed);
 
                 if (ours && !_posInitialized)
                 {

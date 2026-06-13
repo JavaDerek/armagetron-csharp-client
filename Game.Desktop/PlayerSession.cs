@@ -39,7 +39,8 @@ namespace Armagetron.Game
             _lastMoveTick = Tick();
         }
 
-        protected override void OnCyclePositionUpdate(int cycleId, Vec2 pos, Vec2 dir)
+        protected override void OnCyclePositionUpdate(int cycleId, Vec2 pos, Vec2 dir,
+                                                      bool alive, float speed)
         {
             // Remote cycles are server-driven. Our OWN cycle is client-predicted
             // (rendered purely from dead-reckoning in MaybeSendCycleCommand), so we
@@ -48,7 +49,9 @@ namespace Armagetron.Game
             // produced the intermittent "garbled trail" — two writers disagreeing
             // around turns, each disagreement spawning a spurious waypoint.
             if (cycleId == _myCycleId) return;
-            _world.UpdateRemoteCycle(cycleId, pos, dir, System.Environment.TickCount64);
+            // alive=false is the death sync: GameWorld pins the head so the cycle stops
+            // at the wall instead of ghosting through. speed feeds its dead-reckoning.
+            _world.UpdateRemoteCycle(cycleId, pos, dir, System.Environment.TickCount64, alive, speed);
         }
 
         protected override void MaybeSendCycleCommand()

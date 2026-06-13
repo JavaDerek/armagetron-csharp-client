@@ -24,8 +24,15 @@ namespace Armagetron.Protocol.Game
     ///   [5-6]   direction: REAL y (unit axis)
     ///   [7-8]   position : REAL x
     ///   [9-10]  position : REAL y
-    ///   [11-26] further state (speed/rubber/wall/turn counters) — not yet decoded
+    ///   [11-12] speed    : REAL  (units/sec; ≈20 at spawn, cruises 28-33)
+    ///   [13]    alive    : u16   (1 = alive, 0 = dead — the death signal)
+    ///   [14-26] further state (distance/turn-counter/last-pos/rubber) — partially decoded
     /// </code>
+    ///
+    /// <b>Death mechanic</b> (live-verified 2026-06-13): a dying cycle gets one final
+    /// 27w sync with <c>alive=0</c>, then no more syncs. Speed does <i>not</i> drop to 0
+    /// (cycles crash into walls at full cruise), so <see cref="Alive"/> — not speed — is
+    /// the death signal a renderer uses to freeze the cycle. See PROTOCOL.md.
     /// </summary>
     public sealed class CycleStateSync
     {
@@ -40,12 +47,25 @@ namespace Armagetron.Protocol.Game
         public Vec2 Direction { get; }
         public float GameTime { get; }
 
-        public CycleStateSync(int cycleId, Vec2 position, Vec2 direction, float gameTime)
+        /// <summary>Current cycle speed in units/sec (words [11-12]).</summary>
+        public float Speed { get; }
+
+        /// <summary>
+        /// The gCycle alive flag (word [13]): true while the cycle is in play, false on
+        /// the single final sync the server sends when it dies. The authoritative death
+        /// signal — speed stays at cruise on a wall-crash death, so it can't be used.
+        /// </summary>
+        public bool Alive { get; }
+
+        public CycleStateSync(int cycleId, Vec2 position, Vec2 direction, float gameTime,
+                              float speed, bool alive)
         {
             CycleId = cycleId;
             Position = position;
             Direction = direction;
             GameTime = gameTime;
+            Speed = speed;
+            Alive = alive;
         }
 
         /// <summary>
@@ -69,11 +89,14 @@ namespace Armagetron.Protocol.Game
             float dy = r.ReadReal();        // [5-6]
             float px = r.ReadReal();        // [7-8]
             float py = r.ReadReal();        // [9-10]
-            sync = new CycleStateSync(cycleId, new Vec2(px, py), new Vec2(dx, dy), gt);
+            float speed = r.ReadReal();     // [11-12]
+            bool alive = r.ReadUInt16() != 0; // [13]
+            sync = new CycleStateSync(cycleId, new Vec2(px, py), new Vec2(dx, dy), gt, speed, alive);
             return true;
         }
 
         public override string ToString() =>
-            $"CycleStateSync{{cycle={CycleId} pos={Position} dir={Direction} t={GameTime:0.##}}}";
+            $"CycleStateSync{{cycle={CycleId} pos={Position} dir={Direction} " +
+            $"t={GameTime:0.##} speed={Speed:0.##} alive={Alive}}}";
     }
 }

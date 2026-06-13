@@ -26,17 +26,14 @@ namespace Armagetron.Game
 
         public int MyCycleId { get; private set; } = -1;
 
-        // Remote cycles move at the protocol base cycle speed (units/sec); predicted forward
-        // between sparse server syncs. Capped so a cycle that stopped syncing (died/left) does
-        // not coast across the arena. Mirrors ArmagetronSessionBase.CycleSpeed.
+        // Fallback remote speed (units/sec) used only until a sync reports the cycle's
+        // real speed (desc=24 27w word [11-12]). Mirrors ArmagetronSessionBase.CycleSpeed.
         private const float RemoteCycleSpeed   = 30f;
-        // Predict at most this far past the last sync. Bounds the overshoot when a cycle
-        // turns or dies between sparse syncs (it would otherwise coast straight through a
-        // wall until the next sync corrects it). Conservative INTERIM value: with ~1s
-        // straightaway sync gaps a dead cycle has no corrective sync, so smoothness vs.
-        // through-wall overshoot is a direct trade-off. The real fix is event-aware —
-        // decode cycle speed from the 27w sync's undecoded words [11-26] and freeze a
-        // cycle when speed≈0 (death) — tracked as the next step.
+        // Predict at most this far past the last sync. This is now only a backstop for a
+        // LIVING cycle whose syncs went briefly silent (packet loss / sparse straightaway
+        // syncs) — it bounds the coast until the next sync. Death is handled precisely:
+        // the server sends a final sync with alive=0 (word [13]), on which we freeze the
+        // head outright (see PredictedHead), so a dead cycle never extrapolates at all.
         private const float MaxExtrapolationSec = 0.15f;
 
         private sealed class MutableCycleState
@@ -46,6 +43,8 @@ namespace Armagetron.Game
             public bool HasDirection; // false until the first direction is recorded
             public bool IsRemote;     // remote cycles get render-time dead-reckoning in Snapshot
             public long LastSyncMs;   // timestamp of the last remote sync, for extrapolation
+            public float Speed = RemoteCycleSpeed; // server-reported speed, for dead-reckoning
+            public bool Alive = true; // false after a death sync (alive=0): freezes the head
             // Waypoints: spawn position + each subsequent turn point.
             // The active trail segment runs from Trail[^1] to Position.
             public readonly List<Vec2> Trail = new List<Vec2>();
@@ -103,7 +102,18 @@ namespace Armagetron.Game
         public void UpdateRemoteCycle(int cycleId, Vec2 pos, Vec2 dir) =>
             UpdateRemoteCycle(cycleId, pos, dir, nowMs: 0);
 
-        public void UpdateRemoteCycle(int cycleId, Vec2 pos, Vec2 dir, long nowMs)
+        public void UpdateRemoteCycle(int cycleId, Vec2 pos, Vec2 dir, long nowMs) =>
+            UpdateRemoteCycle(cycleId, pos, dir, nowMs, alive: true, speed: RemoteCycleSpeed);
+
+        /// <summary>
+        /// Update a remote cycle with its server-reported <paramref name="alive"/> flag and
+        /// <paramref name="speed"/> (desc=24 27w words [13] and [11-12]). When
+        /// <paramref name="alive"/> is false this is the cycle's death sync: its head is
+        /// pinned at <paramref name="pos"/> and never dead-reckoned again, so it stops at the
+        /// wall it hit instead of ghosting through. <paramref name="speed"/> drives the
+        /// dead-reckoning of a living cycle.
+        /// </summary>
+        public void UpdateRemoteCycle(int cycleId, Vec2 pos, Vec2 dir, long nowMs, bool alive, float speed)
         {
             lock (_lock)
             {
@@ -113,12 +123,13 @@ namespace Armagetron.Game
                     c.Trail.Add(pos); // spawn point is the first waypoint
                     _cycles[cycleId] = c;
                 }
-                else if (c.HasDirection && DirectionChanged(c.Direction, dir))
+                else if (alive && c.HasDirection && DirectionChanged(c.Direction, dir))
                 {
                     // Server syncs are sparse: between c.Position and pos the cycle may have
                     // both moved and turned. Armagetron motion is axis-aligned, so the turn is
                     // an L-joint — reconstruct it rather than drawing a straight diagonal from
-                    // the last sample to this one.
+                    // the last sample to this one. Skipped on the death sync: a crash is not a
+                    // turn, and the final position should anchor the head as-is.
                     c.Trail.Add(ReconstructCorner(c.Position, pos, dir));
                 }
                 c.Position     = pos;
@@ -126,6 +137,8 @@ namespace Armagetron.Game
                 c.HasDirection = true;
                 c.IsRemote     = true;
                 c.LastSyncMs   = nowMs;
+                c.Speed        = speed;
+                c.Alive        = alive;
             }
         }
 
@@ -165,11 +178,13 @@ namespace Armagetron.Game
 
         private static Vec2 PredictedHead(MutableCycleState c, long nowMs)
         {
-            if (!c.IsRemote || !c.HasDirection) return c.Position;
+            // A dead cycle is frozen at its death position — never extrapolate it, or it
+            // would coast through the wall it just crashed into.
+            if (!c.IsRemote || !c.HasDirection || !c.Alive) return c.Position;
             float dt = (nowMs - c.LastSyncMs) / 1000f;
             if (dt <= 0f) return c.Position;
             if (dt > MaxExtrapolationSec) dt = MaxExtrapolationSec;
-            float d = RemoteCycleSpeed * dt;
+            float d = c.Speed * dt;
             return new Vec2(c.Position.X + c.Direction.X * d, c.Position.Y + c.Direction.Y * d);
         }
 
