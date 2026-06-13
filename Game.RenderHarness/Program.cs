@@ -18,27 +18,34 @@ namespace Armagetron.Game.RenderHarness
     {
         private static int Main(string[] args)
         {
-            string outPath = args.Length > 0 ? args[0] : "/tmp/aa_render_spike.png";
-            using var game = new HarnessGame(BuildDeathFreezeScene(), outPath);
+            string scenario = args.Length > 0 ? args[0] : "freeze";
+            string outPath  = args.Length > 1 ? args[1] : $"/tmp/aa_render_{scenario}.png";
+            using var game = new HarnessGame(BuildScene(scenario), outPath);
             game.Run();
             return File.Exists(outPath) ? 0 : 1;
         }
 
         /// <summary>
-        /// Scenario: a remote cycle drives right, turns up, then DIES at the wall
-        /// (alive=false → frozen). Visually proves the death-freeze: the trail must
-        /// stop at the corner+wall and not coast past. Plus our own (green) cycle.
+        /// A remote cycle drives right, turns up, and reaches the TOP WALL — then the
+        /// final sync arrives. The render is taken long after that sync (a dead cycle
+        /// gets no more syncs). Two scenarios isolate the death-freeze fix:
+        ///   "freeze" — final sync is alive=false: head must stop ON the wall.
+        ///   "ghost"  — final sync treated as alive=true (pre-fix behavior): the head
+        ///              dead-reckons past the wall (capped) and poke through it.
         /// </summary>
-        private static GameWorld BuildDeathFreezeScene()
+        private static GameWorld BuildScene(string scenario)
         {
+            bool alive = scenario == "ghost"; // pre-fix: never freezes, keeps extrapolating
+            const float topWall = 176.78f;
+
             var w = new GameWorld();
             w.SetMyCycleId(5);
 
-            // Remote cycle 9: right along y=40, turn up at x=120, then die at (120,160).
-            w.UpdateRemoteCycle(9, new Vec2(10, 40),  new Vec2(1, 0), nowMs: 0,    alive: true,  speed: 30f);
-            w.UpdateRemoteCycle(9, new Vec2(120, 40), new Vec2(1, 0), nowMs: 1000, alive: true,  speed: 30f);
-            w.UpdateRemoteCycle(9, new Vec2(120, 90), new Vec2(0, 1), nowMs: 2000, alive: true,  speed: 30f);
-            w.UpdateRemoteCycle(9, new Vec2(120, 160), new Vec2(0, 1), nowMs: 3000, alive: false, speed: 30f);
+            // Remote cycle 9: right along y=40, turn up at x=120, up to the top wall.
+            w.UpdateRemoteCycle(9, new Vec2(10, 40),       new Vec2(1, 0), nowMs: 0,    alive: true,  speed: 30f);
+            w.UpdateRemoteCycle(9, new Vec2(120, 40),      new Vec2(1, 0), nowMs: 1000, alive: true,  speed: 30f);
+            w.UpdateRemoteCycle(9, new Vec2(120, 90),      new Vec2(0, 1), nowMs: 2000, alive: true,  speed: 30f);
+            w.UpdateRemoteCycle(9, new Vec2(120, topWall), new Vec2(0, 1), nowMs: 3000, alive: alive, speed: 30f);
 
             // Our cycle 5: a short straight run along the bottom.
             w.MoveLocalCycle(5, new Vec2(40, 12), new Vec2(1, 0));
