@@ -22,12 +22,6 @@ namespace Armagetron.Game
         private const float ArenaMargin = 10f;    // screen-pixel padding outside the walls
         private const int   ViewSize    = 800;    // square render area in pixels
 
-        private static readonly Color[] CyclePalette =
-        {
-            Color.Red, Color.Cyan, Color.Yellow, Color.Magenta,
-            Color.Orange, Color.HotPink, Color.DodgerBlue, Color.Lime,
-        };
-
         private readonly GraphicsDeviceManager _graphics;
         private SpriteBatch _spriteBatch    = null!;
         private Texture2D   _pixel          = null!;
@@ -40,9 +34,10 @@ namespace Armagetron.Game
 
         private KeyboardState _prevKeys;
 
-        // Per-session color assignment so colors are stable within a round.
-        private readonly Dictionary<int, Color> _cycleColors = new Dictionary<int, Color>();
-        private int _nextColorIndex;
+        // Pure render model: all "what to draw" decisions (projection, segments, draw
+        // order, colors) live here and are unit-tested; Draw() is only GPU glue.
+        private readonly ArenaView    _view    = new ArenaView(ArenaSize, ArenaMargin, ViewSize);
+        private readonly CyclePalette _palette = new CyclePalette();
 
         /// <summary>
         /// Construct with a session that has ALREADY registered (reached Playing) on the
@@ -107,57 +102,24 @@ namespace Armagetron.Game
             GraphicsDevice.Clear(Color.Black);
             _spriteBatch.Begin();
 
-            DrawArena();
-
-            int           myId     = _world.MyCycleId;
-            // Dead-reckon remote cycles to "now" so they move smoothly between sparse syncs.
+            // Dead-reckon remote cycles to "now" so they move smoothly between sparse syncs,
+            // then let the pure model decide everything; here we only issue the GPU calls.
             CycleSnapshot[] cycles = _world.Snapshot(Environment.TickCount64);
+            Scene scene = SceneBuilder.Build(cycles, _world.MyCycleId, _view, _palette);
 
-            // Draw other cycles first, our cycle on top.
-            foreach (var c in cycles)
-                if (c.CycleId != myId)
-                    DrawCycle(c, CycleColor(c.CycleId, myId));
+            foreach (RenderSegment seg in scene.Segments)
+                DrawLine(ToVec(seg.From), ToVec(seg.To), ToXna(seg.Color), seg.Thickness);
 
-            foreach (var c in cycles)
-                if (c.CycleId == myId)
-                    DrawCycle(c, Color.LawnGreen);
+            foreach (RenderRect r in scene.Heads)
+                _spriteBatch.Draw(_pixel, new Rectangle(r.X, r.Y, r.W, r.H), ToXna(r.Color));
 
             _spriteBatch.End();
             base.Draw(gameTime);
         }
 
-        // ── Rendering helpers ─────────────────────────────────────────────────
+        // ── GPU glue (the only rendering code that needs a graphics device) ───
 
-        private void DrawArena()
-        {
-            float w = ArenaSize;
-            var tl = ToScreen(new Vec2(0, w));
-            var tr = ToScreen(new Vec2(w, w));
-            var br = ToScreen(new Vec2(w, 0));
-            var bl = ToScreen(new Vec2(0, 0));
-
-            DrawLine(tl, tr, Color.White);
-            DrawLine(tr, br, Color.White);
-            DrawLine(br, bl, Color.White);
-            DrawLine(bl, tl, Color.White);
-        }
-
-        private void DrawCycle(CycleSnapshot cycle, Color color)
-        {
-            // Trail: segments between consecutive waypoints.
-            for (int i = 0; i + 1 < cycle.Trail.Length; i++)
-                DrawLine(ToScreen(cycle.Trail[i]), ToScreen(cycle.Trail[i + 1]), color);
-
-            // Active segment: last waypoint → current dead-reckoned position.
-            if (cycle.Trail.Length > 0)
-                DrawLine(ToScreen(cycle.Trail[cycle.Trail.Length - 1]), ToScreen(cycle.Position), color);
-
-            // Cycle head: small filled square.
-            Vector2 head = ToScreen(cycle.Position);
-            _spriteBatch.Draw(_pixel, new Rectangle((int)head.X - 3, (int)head.Y - 3, 7, 7), color);
-        }
-
-        private void DrawLine(Vector2 from, Vector2 to, Color color, float thickness = 2f)
+        private void DrawLine(Vector2 from, Vector2 to, Color color, float thickness)
         {
             Vector2 diff = to - from;
             if (diff == Vector2.Zero) return;
@@ -169,25 +131,8 @@ namespace Armagetron.Game
                 SpriteEffects.None, 0f);
         }
 
-        private Vector2 ToScreen(Vec2 world)
-        {
-            float scale = (ViewSize - 2f * ArenaMargin) / ArenaSize;
-            return new Vector2(
-                ArenaMargin + world.X * scale,
-                ViewSize - ArenaMargin - world.Y * scale); // flip Y: game Y+ is up, screen Y+ is down
-        }
-
-        private Color CycleColor(int cycleId, int myId)
-        {
-            if (cycleId == myId) return Color.LawnGreen;
-            if (!_cycleColors.TryGetValue(cycleId, out Color c))
-            {
-                c = CyclePalette[_nextColorIndex % CyclePalette.Length];
-                _nextColorIndex++;
-                _cycleColors[cycleId] = c;
-            }
-            return c;
-        }
+        private static Vector2 ToVec(Vec2 v) => new Vector2(v.X, v.Y);
+        private static Color ToXna(RenderColor c) => new Color(c.R, c.G, c.B, c.A);
 
         private static bool IsNewPress(KeyboardState cur, KeyboardState prev, Keys key) =>
             cur.IsKeyDown(key) && !prev.IsKeyDown(key);
