@@ -41,10 +41,14 @@ namespace Armagetron.Game
 
         protected override void OnCyclePositionUpdate(int cycleId, Vec2 pos, Vec2 dir)
         {
-            // Server-authoritative position sync for any cycle (including ours).
-            // For our own cycle we also update via dead-reckoning; the server sync
-            // acts as a correction if they differ.
-            _world.UpdateCycle(cycleId, pos, dir);
+            // Remote cycles are server-driven. Our OWN cycle is client-predicted
+            // (rendered purely from dead-reckoning in MaybeSendCycleCommand), so we
+            // deliberately ignore server syncs for it here: feeding the server's
+            // direction into the trail alongside the predicted one is exactly what
+            // produced the intermittent "garbled trail" — two writers disagreeing
+            // around turns, each disagreement spawning a spurious waypoint.
+            if (cycleId == _myCycleId) return;
+            _world.UpdateRemoteCycle(cycleId, pos, dir, System.Environment.TickCount64);
         }
 
         protected override void MaybeSendCycleCommand()
@@ -63,8 +67,9 @@ namespace Armagetron.Game
             }
             _lastMoveTick = now;
 
-            // Push the latest dead-reckoned position to the world for rendering.
-            _world.UpdateCycle(_myCycleId, _pos, _dir);
+            // Push the latest dead-reckoned head position to the world for rendering.
+            // This never adds a trail corner — corners come only from the turn below.
+            _world.MoveLocalCycle(_myCycleId, _pos, _dir);
 
             // Apply and send a queued player turn if one is waiting.
             if (!_pendingTurns.TryDequeue(out var turn)) return;
@@ -73,6 +78,10 @@ namespace Armagetron.Game
                 ? new Vec2(-_dir.Y,  _dir.X)
                 : new Vec2( _dir.Y, -_dir.X);
             _turns++;
+
+            // The corner is exactly the current dead-reckoned position; fix it as a
+            // waypoint so the trail bends cleanly there.
+            _world.TurnLocalCycle(_myCycleId, _pos, _dir);
 
             SendDesc321(_pos, _dir, _dist, _gameTime, _turns);
         }
