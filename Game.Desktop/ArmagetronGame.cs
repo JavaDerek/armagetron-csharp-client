@@ -32,12 +32,10 @@ namespace Armagetron.Game
         private SpriteBatch _spriteBatch    = null!;
         private Texture2D   _pixel          = null!;
 
-        private readonly string _host;
-        private readonly int    _port;
-        private readonly string _playerName;
+        private readonly string _title;
 
-        private readonly GameWorld    _world = new GameWorld();
-        private PlayerSession?        _session;
+        private readonly GameWorld    _world;
+        private readonly PlayerSession _session;
         private Thread?               _sessionThread;
 
         private KeyboardState _prevKeys;
@@ -46,11 +44,17 @@ namespace Armagetron.Game
         private readonly Dictionary<int, Color> _cycleColors = new Dictionary<int, Color>();
         private int _nextColorIndex;
 
-        public ArmagetronGame(string host, int port, string playerName)
+        /// <summary>
+        /// Construct with a session that has ALREADY registered (reached Playing) on the
+        /// caller's uncontended thread — see <see cref="PlayerSession.RunUntilPlaying"/>.
+        /// The render loop here would starve the registration race if it ran first, so
+        /// registration is done before this object exists; we only continue the loop.
+        /// </summary>
+        public ArmagetronGame(PlayerSession session, GameWorld world, string title)
         {
-            _host       = host;
-            _port       = port;
-            _playerName = playerName;
+            _session = session;
+            _world   = world;
+            _title   = title;
 
             _graphics = new GraphicsDeviceManager(this);
             _graphics.PreferredBackBufferWidth  = ViewSize;
@@ -61,11 +65,12 @@ namespace Armagetron.Game
 
         protected override void Initialize()
         {
-            Window.Title = $"Armagetron — {_host}:{_port}  [{_playerName}]  ← → to turn  Esc to quit";
+            Window.Title = _title;
 
-            var link = new UdpLink(_host, _port);
-            _session = new PlayerSession(link, _playerName, _world);
-            _sessionThread = new Thread(() => _session.Run())
+            // Registration already happened on the main thread; just keep the session
+            // pumping for the gameplay phase. Render contention now only affects
+            // dead-reckoning/turns, which tolerate it (unlike one-shot registration).
+            _sessionThread = new Thread(() => _session.RunLoop())
             {
                 IsBackground = true,
                 Name         = "ProtocolThread",
@@ -88,13 +93,10 @@ namespace Armagetron.Game
 
             if (keys.IsKeyDown(Keys.Escape)) Exit();
 
-            if (_session != null)
-            {
-                if (IsNewPress(keys, _prevKeys, Keys.Left))
-                    _session.QueueTurn(TurnDirection.Left);
-                if (IsNewPress(keys, _prevKeys, Keys.Right))
-                    _session.QueueTurn(TurnDirection.Right);
-            }
+            if (IsNewPress(keys, _prevKeys, Keys.Left))
+                _session.QueueTurn(TurnDirection.Left);
+            if (IsNewPress(keys, _prevKeys, Keys.Right))
+                _session.QueueTurn(TurnDirection.Right);
 
             _prevKeys = keys;
             base.Update(gameTime);
@@ -108,7 +110,8 @@ namespace Armagetron.Game
             DrawArena();
 
             int           myId     = _world.MyCycleId;
-            CycleSnapshot[] cycles = _world.Snapshot();
+            // Dead-reckon remote cycles to "now" so they move smoothly between sparse syncs.
+            CycleSnapshot[] cycles = _world.Snapshot(Environment.TickCount64);
 
             // Draw other cycles first, our cycle on top.
             foreach (var c in cycles)
@@ -193,8 +196,9 @@ namespace Armagetron.Game
 
         protected override void UnloadContent()
         {
-            _session?.RequestStop();
+            _session.RequestStop();
             _sessionThread?.Join(millisecondsTimeout: 1000);
+            _session.Dispose();
             _pixel?.Dispose();
             _spriteBatch?.Dispose();
             base.UnloadContent();

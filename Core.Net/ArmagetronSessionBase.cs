@@ -70,8 +70,9 @@ namespace Armagetron.Net
         private const int KeepaliveMs    = 8_000;
 
         // Player object registration
-        private bool _playerObjectSent   = false;
-        private int  _myPlayerNetObjId   = -1;
+        private bool _playerObjectSent     = false;
+        private bool _registrationRejected = false; // server sent desc=3 "cheating" after our desc=201
+        private int  _myPlayerNetObjId     = -1;
 
         // netObject ID reservation pool (desc=20 reply → desc=201 allocation)
         private readonly SortedSet<int> _reservedIds = new SortedSet<int>();
@@ -114,18 +115,54 @@ namespace Armagetron.Net
         public void Run()
         {
             SendPoll();
-            while (!_stopRequested)
-            {
-                byte[]? data = _link.Receive(timeoutMillis: 20);
-                if (data != null) HandlePacket(data);
-                else              HandleIdle();
+            while (!_stopRequested) Pump();
+        }
 
-                if (_speedSyncStep >= 0) MaybeSpeedSync();
-                if (_state == State.Playing) MaybeSendCycleCommand();
-            }
+        /// <summary>
+        /// One iteration of the session loop: receive+dispatch (or idle), advance the
+        /// priming sequence, and let the subclass send cycle commands when Playing.
+        /// </summary>
+        private void Pump()
+        {
+            byte[]? data = _link.Receive(timeoutMillis: 20);
+            if (data != null) HandlePacket(data);
+            else              HandleIdle();
+
+            if (_speedSyncStep >= 0) MaybeSpeedSync();
+            if (_state == State.Playing) MaybeSendCycleCommand();
+        }
+
+        /// <summary>
+        /// Drive the connect→login→register handshake on the CALLER's thread until our
+        /// cycle is created (State.Playing) or <paramref name="timeoutMs"/> elapses.
+        /// Registration is a one-shot, timing-sensitive race against the server; running
+        /// it on an uncontended thread (not a render-starved background thread) is what
+        /// makes desc=201 land inside the server's valid window. Returns true on success.
+        /// </summary>
+        public bool RunUntilPlaying(int timeoutMs)
+        {
+            SendPoll();
+            long deadline = Tick() + timeoutMs;
+            while (!_stopRequested && _state != State.Playing
+                   && !_registrationRejected && Tick() < deadline)
+                Pump();
+            return _state == State.Playing;
+        }
+
+        /// <summary>
+        /// Continue pumping the session loop WITHOUT re-sending the initial poll — used to
+        /// hand a session already advanced by <see cref="RunUntilPlaying"/> off to a
+        /// background thread for the rendering phase.
+        /// </summary>
+        public void RunLoop()
+        {
+            while (!_stopRequested) Pump();
         }
 
         public void RequestStop() => _stopRequested = true;
+
+        /// <summary>True once our gCycle has been created (registration passed the cheating gate).</summary>
+        public bool IsPlaying => _state == State.Playing;
 
         // ── Packet receive ────────────────────────────────────────────────────
 
@@ -341,12 +378,18 @@ namespace Armagetron.Net
 
         private void OnDesc3(NetMessage msg)
         {
-            try
-            {
-                string text = msg.Reader().ReadString();
-                LogBody($"desc=3 text='{text}'", msg);
-            }
-            catch { LogBody("desc=3 (??)", msg); }
+            string text;
+            try { text = msg.Reader().ReadString(); }
+            catch { LogBody("desc=3 (??)", msg); return; }
+
+            LogBody($"desc=3 text='{text}'", msg);
+
+            // After desc=201, a "cheating" notice means our registration was rejected and
+            // the server stops talking to this connection. Flag it so RunUntilPlaying can
+            // bail immediately and the caller can reconnect on a FRESH socket instead of
+            // blocking until timeout on a dead connection.
+            if (_playerObjectSent && text.IndexOf("cheating", StringComparison.OrdinalIgnoreCase) >= 0)
+                _registrationRejected = true;
         }
 
         private void OnDesc28(NetMessage msg)
