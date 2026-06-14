@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Armagetron.Android</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <ApplicationId>com.armagetron.client</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <AndroidManifest>Properties\AndroidManifest.xml</AndroidManifest>
+    <!-- XA0141: MonoGame.Framework.Android 3.8.1.303 ships a prebuilt libopenal32.so that
+         is not 16 KB-page aligned. It lives inside the NuGet package and is unfixable from
+         here; suppress it so the solution's -warnaserror build (build-and-test.sh) is not
+         broken by a third-party artifact. Revisit when MonoGame ships a 16 KB-aligned .so. -->
+    <NoWarn>$(NoWarn);XA0141</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The same platform-agnostic MonoGame host the desktop head uses. The MonoGame
+         API surface (Microsoft.Xna.Framework.*) is identical across the DesktopGL and
+         Android packages, so this single source file compiles unchanged on both. -->
+    <Compile Include="..\Game.Shared\ArmagetronGame.cs" Link="Shared\ArmagetronGame.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.Android" Version="3.8.1.303" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Android talks to the server only through ArmaLib, exactly like the desktop head;
+         ArmaLib transitively brings in Core.Protocol's render model + touch-input types. -->
+    <ProjectReference Include="..\ArmaLib\ArmaLib.csproj" />
+  </ItemGroup>
+
+</Project>

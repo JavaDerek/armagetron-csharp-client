@@ -29,5 +29,5 @@ if (!client.Connect(host, port, name))
 Console.WriteLine("[AaClient] Registered — entering game.");
 
 string title = $"Armagetron — {host}:{port}  [{name}]  ← → to turn  Esc to quit";
-using var game = new ArmagetronGame(client, title);
+using var game = new ArmagetronGame(client, new KeyboardTurnInput(), title);
 game.Run();
