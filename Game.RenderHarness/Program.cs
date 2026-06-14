@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Armagetron.Game;
+using Armagetron.Game.Rendering;
 using Armagetron.Game.UI;
 using Armagetron.Protocol;
 using Microsoft.Xna.Framework;
@@ -105,7 +106,7 @@ namespace Armagetron.Game.RenderHarness
 
             var view = new ArenaView(arenaSize: topWall, margin: 10f, viewSize: Size);
             return SceneBuilder.BuildWithArt(w.Snapshot(nowMs: 9_999), w.MyCycleId, view,
-                                             new CyclePalette(), new RenderColor(0x16, 0x22, 0x3A), divisions: 8);
+                                             new CyclePalette(), divisions: 8);
         }
 
         /// <summary>Exercises every placeholder glyph so the font can be eyeballed.</summary>
@@ -153,8 +154,9 @@ namespace Armagetron.Game.RenderHarness
         private readonly int _size;
         private readonly string _outPath;
 
-        private SpriteBatch _spriteBatch = null!;
-        private Texture2D _pixel = null!;
+        private TextureStore _textures = null!;
+        private TextRenderer _text = null!;
+        private SceneRenderer _renderer = null!;
         private bool _captured;
 
         public HarnessGame(Scene scene, int size, string outPath)
@@ -171,9 +173,9 @@ namespace Armagetron.Game.RenderHarness
 
         protected override void LoadContent()
         {
-            _spriteBatch = new SpriteBatch(GraphicsDevice);
-            _pixel = new Texture2D(GraphicsDevice, 1, 1);
-            _pixel.SetData(new[] { Color.White });
+            _textures = new TextureStore(GraphicsDevice);
+            _text = new TextRenderer();
+            _renderer = new SceneRenderer(GraphicsDevice, _textures, _text);
         }
 
         protected override void Update(GameTime gameTime)
@@ -183,16 +185,9 @@ namespace Armagetron.Game.RenderHarness
             var rt = new RenderTarget2D(GraphicsDevice, _size, _size);
             GraphicsDevice.SetRenderTarget(rt);
             GraphicsDevice.Clear(Color.Black);
-            _spriteBatch.Begin();
 
-            foreach (RenderSegment seg in _scene.Segments)
-                DrawLine(seg.From, seg.To, ToXna(seg.Color), seg.Thickness);
-            foreach (RenderRect r in _scene.Heads)
-                _spriteBatch.Draw(_pixel, new Rectangle(r.X, r.Y, r.W, r.H), ToXna(r.Color));
-            foreach (RenderText t in _scene.Texts)
-                DrawText(t);
+            _renderer.Render(_scene, 0, 0);
 
-            _spriteBatch.End();
             GraphicsDevice.SetRenderTarget(null);
 
             using (var fs = File.Create(_outPath))
@@ -201,36 +196,12 @@ namespace Armagetron.Game.RenderHarness
             _captured = true;
         }
 
-        // Draw a RenderText one lit glyph-cell at a time (placeholder PixelFont). When the
-        // designer's real font lands this is replaced by a SpriteFont DrawString.
-        private void DrawText(RenderText t)
+        protected override void UnloadContent()
         {
-            Color color = ToXna(t.Color);
-            for (int i = 0; i < t.Text.Length; i++)
-            {
-                Glyph g = PixelFont.Get(t.Text[i]);
-                int gx = t.X + i * PixelFont.Advance * t.Scale;
-                for (int row = 0; row < PixelFont.GlyphHeight; row++)
-                    for (int col = 0; col < PixelFont.GlyphWidth; col++)
-                        if (g.IsLit(col, row))
-                            _spriteBatch.Draw(_pixel,
-                                new Rectangle(gx + col * t.Scale, t.Y + row * t.Scale, t.Scale, t.Scale),
-                                color);
-            }
+            _renderer?.Dispose();
+            _text?.Dispose();
+            _textures?.Dispose();
+            base.UnloadContent();
         }
-
-        private void DrawLine(Vec2 from, Vec2 to, Color color, float thickness)
-        {
-            var f = new Vector2(from.X, from.Y);
-            var t = new Vector2(to.X, to.Y);
-            Vector2 diff = t - f;
-            if (diff == Vector2.Zero) return;
-            float angle = MathF.Atan2(diff.Y, diff.X);
-            float len = diff.Length();
-            _spriteBatch.Draw(_pixel, f, null, color, angle, Vector2.Zero,
-                new Vector2(len, thickness), SpriteEffects.None, 0f);
-        }
-
-        private static Color ToXna(RenderColor c) => new Color(c.R, c.G, c.B, c.A);
     }
 }

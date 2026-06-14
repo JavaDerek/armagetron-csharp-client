@@ -18,6 +18,7 @@ namespace Armagetron.Game.UI
         public RenderColor Button        = new RenderColor(0x14, 0x30, 0x4A); // deep cyan-blue
         public RenderColor ButtonPressed = new RenderColor(0x1F, 0xE3, 0xFF); // --cyan (brightens on press)
         public RenderColor ButtonDisabled= new RenderColor(0x0C, 0x13, 0x22); // flat surface
+        public RenderColor ButtonText    = new RenderColor(0x04, 0x14, 0x1A); // dark ink on bright CTA (nine-slice.json)
         public RenderColor Text          = new RenderColor(0xDC, 0xEA, 0xF2); // --text
         public RenderColor TextMuted     = new RenderColor(0x9B, 0xB0, 0xC8); // --dim
         public RenderColor Accent        = new RenderColor(0x1F, 0xE3, 0xFF); // --cyan (signature)

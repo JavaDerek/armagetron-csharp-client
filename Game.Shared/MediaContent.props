@@ -1,0 +1,20 @@
+<Project>
+  <!-- The designer's production asset files, copied next to the binary so the TextureStore /
+       TextRenderer can load them at runtime from "<base>/media/..." (no MGCB pipeline). Imported
+       by the desktop heads (Game.Desktop, Game.RenderHarness). Android ships these as packaged
+       assets separately (phase 6) so it is intentionally not importing this. -->
+  <ItemGroup>
+    <Content Include="$(MSBuildThisFileDirectory)..\media\nine-slice\*_9slice.png"
+             Link="media\nine-slice\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(MSBuildThisFileDirectory)..\media\in-game\*.png"
+             Link="media\in-game\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(MSBuildThisFileDirectory)..\media\icons\png\**\*-2x.png"
+             Link="media\icons\png\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(MSBuildThisFileDirectory)..\media\fonts\**\*.ttf"
+             Link="media\fonts\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(MSBuildThisFileDirectory)..\media\splash\splash_1080.png"
+             Link="media\splash\splash_1080.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(MSBuildThisFileDirectory)..\media\audio\music\*.mp3"
+             Link="media\audio\music\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,4 +1,5 @@
 using System;
+using Armagetron.Game.Rendering;
 using Armagetron.Game.UI;
 using Armagetron.Protocol;
 using Microsoft.Xna.Framework;
@@ -20,15 +21,18 @@ namespace Armagetron.Game
         // Arena runs 0→ArenaSize in both axes (empirical; replaced by desc=51 decode later).
         private const float ArenaSize   = 176.78f;
         private const float ArenaMargin = 10f;
-        private const int   WindowSize  = 800;
+        // Landscape window matching the design's 2400×1080 reference (16:9-ish) so the redline
+        // layouts read correctly; the arena itself stays a centred square inside it.
+        private const int   WindowW = 1280;
+        private const int   WindowH = 720;
 
-        // Faint floor grid in the design's --raise tone (placeholder until the arena texture lands).
-        private static readonly RenderColor GridColor = new RenderColor(0x16, 0x22, 0x3A);
+        // Arena floor tiling resolution (arena_tile cells per axis).
         private const int GridDivisions = 8;
 
         private readonly GraphicsDeviceManager _graphics;
-        private SpriteBatch _spriteBatch = null!;
-        private Texture2D   _pixel       = null!;
+        private TextureStore  _textures = null!;
+        private TextRenderer  _text     = null!;
+        private SceneRenderer _renderer = null!;
 
         private readonly string _title;
         private readonly IUiClient _client;
@@ -61,9 +65,10 @@ namespace Armagetron.Game
             }
             else
             {
-                _graphics.PreferredBackBufferWidth  = WindowSize;
-                _graphics.PreferredBackBufferHeight = WindowSize;
+                _graphics.PreferredBackBufferWidth  = WindowW;
+                _graphics.PreferredBackBufferHeight = WindowH;
             }
+            Window.AllowUserResizing = true;
             Content.RootDirectory = "Content";
             IsMouseVisible = true;
         }
@@ -71,9 +76,9 @@ namespace Armagetron.Game
         protected override void LoadContent()
         {
             Window.Title = _title;
-            _spriteBatch = new SpriteBatch(GraphicsDevice);
-            _pixel       = new Texture2D(GraphicsDevice, 1, 1);
-            _pixel.SetData(new[] { Color.White });
+            _textures = new TextureStore(GraphicsDevice);
+            _text     = new TextRenderer();
+            _renderer = new SceneRenderer(GraphicsDevice, _textures, _text);
             EnsureView();
         }
 
@@ -112,67 +117,25 @@ namespace Armagetron.Game
         protected override void Draw(GameTime gameTime)
         {
             GraphicsDevice.Clear(Color.Black);
-            _spriteBatch.Begin();
 
             if (_shell.ShowsGameplay)
             {
                 Scene game = SceneBuilder.BuildWithArt(_snapshot, _client.MyCycleId, _view, _palette,
-                                                       GridColor, GridDivisions);
-                DrawScene(game, _offsetX, _offsetY);
+                                                       GridDivisions);
+                _renderer.Render(game, _offsetX, _offsetY);
             }
 
-            DrawScene(_shell.BuildOverlay(_w, _h, _nowMs), 0, 0);
+            _renderer.Render(_shell.BuildOverlay(_w, _h, _nowMs), 0, 0);
 
-            _spriteBatch.End();
             base.Draw(gameTime);
         }
-
-        // ── GPU glue (the only rendering code that needs a graphics device) ───────
-
-        private void DrawScene(Scene scene, int dx, int dy)
-        {
-            foreach (RenderSegment seg in scene.Segments)
-                DrawLine(seg.From.X + dx, seg.From.Y + dy, seg.To.X + dx, seg.To.Y + dy,
-                         ToXna(seg.Color), seg.Thickness);
-            foreach (RenderRect r in scene.Heads)
-                _spriteBatch.Draw(_pixel, new Rectangle(r.X + dx, r.Y + dy, r.W, r.H), ToXna(r.Color));
-            foreach (RenderText t in scene.Texts)
-                DrawText(t, dx, dy);
-        }
-
-        private void DrawText(RenderText t, int dx, int dy)
-        {
-            Color color = ToXna(t.Color);
-            for (int i = 0; i < t.Text.Length; i++)
-            {
-                Glyph g = PixelFont.Get(t.Text[i]);
-                int gx = t.X + dx + i * PixelFont.Advance * t.Scale;
-                for (int row = 0; row < PixelFont.GlyphHeight; row++)
-                    for (int col = 0; col < PixelFont.GlyphWidth; col++)
-                        if (g.IsLit(col, row))
-                            _spriteBatch.Draw(_pixel,
-                                new Rectangle(gx + col * t.Scale, t.Y + dy + row * t.Scale, t.Scale, t.Scale),
-                                color);
-            }
-        }
-
-        private void DrawLine(float x0, float y0, float x1, float y1, Color color, float thickness)
-        {
-            var from = new Vector2(x0, y0);
-            Vector2 diff = new Vector2(x1, y1) - from;
-            if (diff == Vector2.Zero) return;
-            float angle = MathF.Atan2(diff.Y, diff.X);
-            _spriteBatch.Draw(_pixel, from, null, color, angle, Vector2.Zero,
-                new Vector2(diff.Length(), thickness), SpriteEffects.None, 0f);
-        }
-
-        private static Color ToXna(RenderColor c) => new Color(c.R, c.G, c.B, c.A);
 
         protected override void UnloadContent()
         {
             _client.Disconnect();
-            _pixel?.Dispose();
-            _spriteBatch?.Dispose();
+            _renderer?.Dispose();
+            _text?.Dispose();
+            _textures?.Dispose();
             base.UnloadContent();
         }
     }

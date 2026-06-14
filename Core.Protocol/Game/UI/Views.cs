@@ -3,10 +3,12 @@ using Armagetron.Protocol;
 namespace Armagetron.Game.UI
 {
     /// <summary>
-    /// Per-screen view builders: each appends its placeholder visuals to a <see cref="SceneBuf"/>
-    /// from a pure layout + state. No GPU, no platform — fully unit-testable by asserting on the
-    /// emitted draw commands. All colors come from <see cref="UiTheme"/> and all glyphs from the
-    /// placeholder <see cref="PixelFont"/>, so the designer's assets drop in without touching these.
+    /// Per-screen view builders: each appends its visuals to a <see cref="SceneBuf"/> from a pure
+    /// layout + state. No GPU, no platform — fully unit-testable by asserting on the emitted draw
+    /// commands. Colors come from <see cref="UiTheme"/>; chrome is the designer's nine-slice
+    /// panels/buttons and icon sprites; text names a <see cref="FontRole"/> (Orbitron for
+    /// titles/banners, Rajdhani for UI/body, Share Tech Mono for numerals) which the head renders
+    /// with the real OFL fonts.
     /// </summary>
     public static class ConnectView
     {
@@ -15,11 +17,10 @@ namespace Armagetron.Game.UI
                                string? error, bool formValid, int w, int h)
         {
             buf.Fill(new UiRect(0, 0, w, h), t.Background);
-            buf.Fill(L.Panel, t.Panel);
-            buf.Border(L.Panel, t.PanelBorder);
+            buf.Panel(L.Panel);
 
-            buf.TextCenter("ARMAGETRON", L.Panel.CenterX, L.TitleY, t.Accent, L.TitleScale);
-            buf.TextCenter("CONNECT TO SERVER", L.Panel.CenterX, L.SubY, t.TextMuted, L.TextScale);
+            buf.TextCenter("ARMAGETRON", L.Panel.CenterX, L.TitleY, t.Accent, L.TitleScale, FontRole.Title);
+            buf.TextCenter("CONNECT TO SERVER", L.Panel.CenterX, L.SubY, t.TextMuted, L.TextScale, FontRole.Label);
 
             buf.DrawField(host, t, L.TextScale);
             buf.DrawField(port, t, L.TextScale);
@@ -27,12 +28,13 @@ namespace Armagetron.Game.UI
 
             buf.DrawButton(new UiButton("connect", L.Connect, "CONNECT") { Enabled = formValid },
                            t, L.TextScale);
-            buf.DrawButton(new UiButton("browse", L.Browse, "SERVER BROWSER"), t, L.TextScale);
-            // Placeholder gear: a '*' until the designer's settings icon arrives (DESIGN_BRIEF §8).
-            buf.DrawButton(new UiButton("settings", L.Settings, "*"), t, L.TextScale);
+            buf.DrawButton(new UiButton("browse", L.Browse, "SERVER BROWSER"), t, L.TextScale,
+                           ButtonStyle.Secondary);
+            // Real settings gear icon (DESIGN_BRIEF §8) in place of the old '*' placeholder.
+            buf.Icon("gear", L.Settings, pad: 6);
 
             if (!string.IsNullOrEmpty(error))
-                buf.TextCenter(error, L.Panel.CenterX, L.ErrorY, t.Danger, L.TextScale);
+                buf.TextCenter(error, L.Panel.CenterX, L.ErrorY, t.Danger, L.TextScale, FontRole.Label);
         }
     }
 
@@ -45,9 +47,9 @@ namespace Armagetron.Game.UI
             int dots = (int)(now / 400 % 4);
             buf.TextCenter("CONNECTING" + new string('.', dots),
                            w / 2, L.CenterY - PixelFont.Height(L.TextScale * 2) - 24,
-                           t.Text, L.TextScale * 2);
-            buf.TextCenter(host + ":" + port, w / 2, L.CenterY + 8, t.TextMuted, L.TextScale);
-            buf.DrawButton(new UiButton("cancel", L.Cancel, "CANCEL"), t, L.TextScale);
+                           t.Text, L.TextScale * 2, FontRole.Title);
+            buf.TextCenter(host + ":" + port, w / 2, L.CenterY + 8, t.TextMuted, L.TextScale, FontRole.Mono);
+            buf.DrawButton(new UiButton("cancel", L.Cancel, "CANCEL"), t, L.TextScale, ButtonStyle.Secondary);
         }
     }
 
@@ -63,10 +65,10 @@ namespace Armagetron.Game.UI
         {
             int ts = L.TextScale, m = L.Margin, line = PixelFont.Height(ts) + 6;
 
-            buf.TextLeft(playerName, m, m, nameColor, ts);
-            buf.TextLeft("TIME " + match.TimeLabel(now), m, m + line, t.Text, ts);
+            buf.TextLeft(playerName, m, m, nameColor, ts, FontRole.Label);
+            buf.TextLeft("TIME " + match.TimeLabel(now), m, m + line, t.Text, ts, FontRole.Mono);
             buf.TextLeft("ROUND " + match.RoundNumber + "   CYCLES " + match.CycleCount,
-                         m, m + 2 * line, t.TextMuted, ts);
+                         m, m + 2 * line, t.TextMuted, ts, FontRole.Mono);
 
             // Connection indicator: a colored dot left of the pause button.
             RenderColor dot = status == ConnectionStatus.Connected ? t.Success
@@ -75,33 +77,32 @@ namespace Armagetron.Game.UI
             int d = PixelFont.Height(ts);
             buf.Fill(new UiRect(L.Pause.X - d - 12, L.Pause.CenterY - d / 2, d, d), dot);
 
-            // Placeholder pause glyph "II" until the designer's pause icon arrives (DESIGN_BRIEF §8).
-            buf.DrawButton(new UiButton("pause", L.Pause, "II"), t, ts);
+            // Real pause icon in place of the old "II" placeholder.
+            buf.Icon("pause", L.Pause, pad: 4);
 
             // Round banner: a big centred announcement at round start / round over. NB a true
             // pre-round 3·2·1 countdown needs the desc=24 negative game_time decode (PROTOCOL.md
             // open item); until then this is an honest round-start/over banner placeholder.
             int bannerY = h / 4;
             if (match.RoundActive && match.ElapsedMs(now) < 2_500)
-                buf.TextCenter("ROUND " + match.RoundNumber, w / 2, bannerY, t.Accent, ts * 3);
+                buf.TextCenter("ROUND " + match.RoundNumber, w / 2, bannerY, t.Accent, ts * 3, FontRole.Title);
             else if (!match.RoundActive && match.RoundNumber > 0)
-                buf.TextCenter("ROUND OVER", w / 2, bannerY, t.Text, ts * 3);
+                buf.TextCenter("ROUND OVER", w / 2, bannerY, t.Text, ts * 3, FontRole.Title);
 
             // Death / spectator overlay (design 5.7): ELIMINATED + a spectating line. The arena
-            // keeps playing underneath at full brightness (placeholder for the design's dimmed
-            // spectator camera, which needs per-cycle follow once cycles are individually tracked).
+            // keeps playing underneath (placeholder for the design's dimmed spectator camera).
             if (!match.LocalAlive)
             {
-                buf.TextCenter("ELIMINATED", w / 2, h / 2 - PixelFont.Height(ts * 3), t.Danger, ts * 3);
+                buf.TextCenter("ELIMINATED", w / 2, h / 2 - PixelFont.Height(ts * 3), t.Danger, ts * 3, FontRole.Title);
                 buf.TextCenter("SPECTATING - " + match.CycleCount + " CYCLES",
-                               w / 2, h / 2 + PixelFont.Height(ts), t.TextMuted, ts);
+                               w / 2, h / 2 + PixelFont.Height(ts), t.TextMuted, ts, FontRole.Label);
             }
 
             // Toast stack: newest at the bottom, older ones rising above it.
             int toastY = (int)(h * 0.72);
             for (int i = toasts.Count - 1; i >= 0; i--)
             {
-                buf.TextCenter(toasts[i].Text, w / 2, toastY, toasts[i].Color, ts);
+                buf.TextCenter(toasts[i].Text, w / 2, toastY, toasts[i].Color, ts, FontRole.Label);
                 toastY -= PixelFont.Height(ts) + 8;
             }
         }
@@ -109,22 +110,22 @@ namespace Armagetron.Game.UI
 
     public static class TouchOverlay
     {
-        /// <summary>The tap-to-turn affordance (Android): a faint center divider, dim chevrons,
-        /// and a first-run hint until the player has turned once.</summary>
+        /// <summary>The tap-to-turn affordance (Android): a faint center divider, dim chevron
+        /// icons, and a first-run hint until the player has turned once.</summary>
         public static void Add(SceneBuf buf, UiTheme t, int w, int h, bool showHint)
         {
             var faint = new RenderColor(255, 255, 255, 45);
             buf.Line(new Vec2(w / 2f, 0), new Vec2(w / 2f, h), faint, 2f);
 
             int ts = Layouts.TextScale(h);
-            var chev = new RenderColor(255, 255, 255, 70);
-            int cy = h - PixelFont.Height(ts * 2) - 28;
-            buf.TextCenter("<", w / 4, cy, chev, ts * 2);
-            buf.TextCenter(">", w * 3 / 4, cy, chev, ts * 2);
+            int cs = PixelFont.Height(ts * 3);
+            int cy = h - cs - 20;
+            buf.Icon("chevron-left", new UiRect(w / 4 - cs / 2, cy, cs, cs));
+            buf.Icon("chevron-right", new UiRect(w * 3 / 4 - cs / 2, cy, cs, cs));
 
             if (showHint)
                 buf.TextCenter("TAP LEFT / RIGHT TO TURN", w / 2, h - PixelFont.Height(ts) - 12,
-                               t.Accent, ts);
+                               t.Accent, ts, FontRole.Label);
         }
     }
 
@@ -138,14 +139,14 @@ namespace Armagetron.Game.UI
                                int w, int h)
         {
             int ts = L.TextScale;
-            buf.Fill(new UiRect(0, 0, w, h), new RenderColor(0, 0, 0, 170));
-            buf.Fill(L.Panel, t.Panel);
-            buf.Border(L.Panel, t.PanelBorder);
-            buf.TextCenter("SETTINGS", L.Panel.CenterX, L.TitleY, t.Accent, L.TitleScale);
+            buf.Fill(new UiRect(0, 0, w, h), new RenderColor(4, 6, 12, 140)); // scrim
+            buf.Panel(L.Panel);
+            buf.TextCenter("SETTINGS", L.Panel.CenterX, L.TitleY, t.Accent, L.TitleScale, FontRole.Title);
 
             // Player name (left) + signature swatches (right)
             buf.DrawField(name, t, ts);
-            buf.TextLeft("SIGNATURE COLOR", L.Swatches[0].X, L.Swatches[0].Y - PixelFont.Height(ts) - 5, t.TextMuted, ts);
+            buf.TextLeft("SIGNATURE COLOR", L.Swatches[0].X, L.Swatches[0].Y - PixelFont.Height(ts) - 5,
+                         t.TextMuted, ts, FontRole.Label);
             for (int i = 0; i < L.Swatches.Length; i++)
             {
                 buf.Fill(L.Swatches[i], swatchColors[i % swatchColors.Count]);
@@ -164,38 +165,42 @@ namespace Armagetron.Game.UI
             for (int i = 0; i < L.Toggles.Length; i++)
             {
                 UiRect cell = L.Toggles[i];
-                buf.TextLeft(ToggleLabels[i], cell.X, cell.CenterY - PixelFont.Height(ts) / 2, t.Text, ts);
+                buf.TextLeft(ToggleLabels[i], cell.X, cell.CenterY - PixelFont.Height(ts) / 2, t.Text, ts, FontRole.Label);
                 var pill = new UiRect(cell.Right - 60, cell.Y, 60, cell.H);
                 buf.DrawToggle(pill, on[i], t);
             }
 
-            buf.DrawButton(new UiButton("back", L.Back, "BACK"), t, ts);
+            buf.DrawButton(new UiButton("back", L.Back, "BACK"), t, ts, ButtonStyle.Secondary);
         }
 
         private static void Label(SceneBuf buf, UiTheme t, int ts, string text, string value, UiRect track)
         {
             int y = track.Y - PixelFont.Height(ts) - 10;
-            buf.TextLeft(text, track.X, y, t.TextMuted, ts);
-            buf.TextLeft(value, track.Right - PixelFont.MeasureWidth(value, ts), y, t.Accent, ts);
+            buf.TextLeft(text, track.X, y, t.TextMuted, ts, FontRole.Label);
+            buf.TextRight(value, track.Right, y, t.Accent, ts, FontRole.Mono);
         }
     }
 
     public static class MenuView
     {
-        /// <summary>A dimmed modal with a title (optional subtitle) and a vertical button stack.</summary>
+        /// <summary>A scrimmed modal with a title (optional subtitle) and a vertical button stack.
+        /// The first button is the primary CTA; the rest are outlined secondary buttons
+        /// (design 5.7/10).</summary>
         public static void Add(SceneBuf buf, UiTheme t, Layouts.MenuL L, string title,
                                string[] labels, int w, int h, string? subtitle = null)
         {
-            buf.Fill(new UiRect(0, 0, w, h), new RenderColor(0, 0, 0, 170)); // dim
-            buf.Fill(L.Panel, t.Panel);
-            buf.Border(L.Panel, t.PanelBorder);
-            buf.TextCenter(title, L.Panel.CenterX, L.TitleY, t.Accent, L.TitleScale);
+            buf.Fill(new UiRect(0, 0, w, h), new RenderColor(4, 6, 12, 180)); // scrim
+            buf.Panel(L.Panel);
+            buf.TextCenter(title, L.Panel.CenterX, L.TitleY, t.Accent, L.TitleScale, FontRole.Title);
             if (!string.IsNullOrEmpty(subtitle))
                 buf.TextCenter(subtitle, L.Panel.CenterX, L.TitleY + PixelFont.Height(L.TitleScale) + 8,
-                               t.TextMuted, L.TextScale);
+                               t.TextMuted, L.TextScale, FontRole.Label);
 
             for (int i = 0; i < labels.Length && i < L.Buttons.Length; i++)
-                buf.DrawButton(new UiButton("menu" + i, L.Buttons[i], labels[i]), t, L.TextScale);
+            {
+                ButtonStyle style = i == 0 ? ButtonStyle.Primary : ButtonStyle.Secondary;
+                buf.DrawButton(new UiButton("menu" + i, L.Buttons[i], labels[i]), t, L.TextScale, style);
+            }
         }
     }
 }

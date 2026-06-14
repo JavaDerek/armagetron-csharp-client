@@ -132,7 +132,7 @@ namespace Armagetron.Game.UI
             y += labelH + fieldH + 26;
 
             // Rows 3–4: four toggles in a 2×2 grid
-            int pillW = 60, pillH = PixelFont.Height(ts) + 12;
+            int pillH = PixelFont.Height(ts) + 12;
             var toggles = new UiRect[4];
             for (int i = 0; i < 4; i++)
             {

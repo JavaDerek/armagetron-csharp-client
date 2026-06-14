@@ -1,0 +1,10 @@
+<Project>
+  <!-- The shared, engine-glue render code (texture store, TTF text, the Scene draw loop).
+       Compile-linked into every MonoGame head (Desktop, Android, RenderHarness) exactly like
+       ArmagetronGame.cs, so all heads render an identical Scene. -->
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Rendering\TextureStore.cs" Link="Shared\Rendering\TextureStore.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Rendering\TextRenderer.cs" Link="Shared\Rendering\TextRenderer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Rendering\SceneRenderer.cs" Link="Shared\Rendering\SceneRenderer.cs" />
+  </ItemGroup>
+</Project>

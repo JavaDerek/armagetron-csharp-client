@@ -27,6 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FontStashSharp.MonoGame" Version="1.5.6" />
     <PackageReference Include="MonoGame.Framework.Android" Version="3.8.1.303" />
   </ItemGroup>
 
@@ -35,5 +36,9 @@
          ArmaLib transitively brings in Core.Protocol's render model + touch-input types. -->
     <ProjectReference Include="..\ArmaLib\ArmaLib.csproj" />
   </ItemGroup>
+
+  <!-- Same shared render glue the desktop head compiles. Media files are packaged as Android
+       assets in phase 6; the loaders degrade gracefully until then. -->
+  <Import Project="..\Game.Shared\RenderingCode.props" />
 
 </Project>

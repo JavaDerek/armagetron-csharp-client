@@ -6,10 +6,11 @@ using Xunit;
 namespace Armagetron.Protocol.Tests.Game
 {
     /// <summary>
-    /// Tests for the placeholder in-game art: the arena floor grid and the directional cycle
-    /// nose layered in by <see cref="SceneBuilder.BuildWithArt"/>. The core
-    /// <see cref="SceneBuilder.Build"/> geometry is covered by SceneBuilderTests and must stay
-    /// unchanged, so these assert only the added layer.
+    /// Tests for the designer's in-game art layered in by <see cref="SceneBuilder.BuildWithArt"/>:
+    /// the tiled <c>arena_tile</c> floor under everything, the preserved procedural border/trail
+    /// segments, and a tinted, heading-rotated <c>cycle</c> sprite per head. The core
+    /// <see cref="SceneBuilder.Build"/> geometry is covered by SceneBuilderTests and stays
+    /// unchanged. (<see cref="ArenaView.Grid"/> remains a tested geometry helper in its own right.)
     /// </summary>
     public class ArenaArtTests
     {
@@ -31,7 +32,7 @@ namespace Armagetron.Protocol.Tests.Game
         }
 
         [Fact]
-        public void BuildWithArt_AddsGridUnderneath_AndKeepsHeads()
+        public void BuildWithArt_TilesFloorUnderneath_AndPreservesTrailSegments()
         {
             var cycles = new[]
             {
@@ -40,18 +41,21 @@ namespace Armagetron.Protocol.Tests.Game
             };
             var v = View();
             Scene plain = SceneBuilder.Build(cycles, myId: 5, v, new CyclePalette());
-            Scene art   = SceneBuilder.BuildWithArt(cycles, myId: 5, v, new CyclePalette(), Grid, 8);
+            Scene art   = SceneBuilder.BuildWithArt(cycles, myId: 5, v, new CyclePalette(), 8);
 
-            // Grid (14) + a directional nose (1) more segments than the plain build.
-            Assert.Equal(plain.Segments.Count + 14 + 1, art.Segments.Count);
-            // First segments are the grid (drawn underneath).
-            Assert.Equal(Grid, art.Segments[0].Color);
-            // Heads are preserved unchanged.
-            Assert.Equal(plain.Heads.Count, art.Heads.Count);
+            // 8×8 arena_tile floor sprites + one cycle sprite.
+            Assert.Equal(64 + 1, art.Sprites.Count);
+            Assert.Equal(64, art.Sprites.Count(s => s.Key == "ingame/arena"));
+            Assert.Single(art.Sprites, s => s.Key == "ingame/cycle");
+            // The border + trail line segments are preserved unchanged.
+            Assert.Equal(plain.Segments.Count, art.Segments.Count);
+            // First command is a floor tile (drawn underneath everything).
+            Assert.IsType<RenderSprite>(art.Commands[0]);
+            Assert.Equal("ingame/arena", ((RenderSprite)art.Commands[0]).Key);
         }
 
         [Fact]
-        public void BuildWithArt_NoseExtendsFromHead_InDirection()
+        public void BuildWithArt_CycleSprite_TintedAndHeadingRotated()
         {
             var cycles = new[]
             {
@@ -59,18 +63,20 @@ namespace Armagetron.Protocol.Tests.Game
                                     Direction = new Vec2(1, 0), Trail = System.Array.Empty<Vec2>() },
             };
             var v = View();
-            Scene art = SceneBuilder.BuildWithArt(cycles, myId: 5, v, new CyclePalette(), Grid, 8);
+            Scene art = SceneBuilder.BuildWithArt(cycles, myId: 5, v, new CyclePalette(), 8);
 
-            // The nose is the local-color thick segment starting at the head's screen position.
-            RenderSegment nose = art.Segments.Last();
-            Assert.Equal(CyclePalette.Mine, nose.Color);
-            Assert.Equal(v.ToScreen(new Vec2(40, 40)), nose.From);
-            // Heading +X → tip is to the right of the head on screen.
-            Assert.True(nose.To.X > nose.From.X);
+            RenderSprite cycle = art.Sprites.Single(s => s.Key == "ingame/cycle");
+            Assert.Equal(CyclePalette.Mine, cycle.Tint);          // local cycle takes the signature color
+            // Heading +X (nose-up master) → +90° rotation.
+            Assert.Equal((float)(System.Math.PI / 2.0), cycle.Rotation, 3);
+            // Centered on the head's screen position.
+            Vec2 head = v.ToScreen(new Vec2(40, 40));
+            Assert.Equal((int)head.X, cycle.X + cycle.W / 2);
+            Assert.Equal((int)head.Y, cycle.Y + cycle.H / 2);
         }
 
         [Fact]
-        public void BuildWithArt_ZeroDirection_AddsNoNose()
+        public void BuildWithArt_ZeroDirection_CycleNotRotated()
         {
             var cycles = new[]
             {
@@ -78,10 +84,9 @@ namespace Armagetron.Protocol.Tests.Game
                                     Direction = new Vec2(0, 0), Trail = System.Array.Empty<Vec2>() },
             };
             var v = View();
-            Scene art   = SceneBuilder.BuildWithArt(cycles, myId: 5, v, new CyclePalette(), Grid, 8);
-            // Only the 14 grid lines added over the plain build (no nose for a still cycle).
-            Scene plain = SceneBuilder.Build(cycles, myId: 5, v, new CyclePalette());
-            Assert.Equal(plain.Segments.Count + 14, art.Segments.Count);
+            Scene art = SceneBuilder.BuildWithArt(cycles, myId: 5, v, new CyclePalette(), 8);
+            RenderSprite cycle = art.Sprites.Single(s => s.Key == "ingame/cycle");
+            Assert.Equal(0f, cycle.Rotation);
         }
     }
 }

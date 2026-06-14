@@ -105,36 +105,63 @@ namespace Armagetron.Protocol.Tests.Game
         }
 
         [Fact]
-        public void TextCenter_CentersHorizontally()
+        public void TextCenter_AnchorsCenterX_WithCenterAlign()
         {
             var buf = new SceneBuf();
             buf.TextCenter("AB", centerX: 100, y: 0, RenderColor.White, scale: 2);
             RenderText t = buf.Texts.Single();
-            Assert.Equal(100 - PixelFont.MeasureWidth("AB", 2) / 2, t.X);
+            // The head resolves the left origin from the real font; the neutral layer just
+            // records the center anchor + alignment.
+            Assert.Equal(100, t.X);
+            Assert.Equal(TextAlign.Center, t.Align);
         }
 
         [Fact]
-        public void DrawButton_DisabledUsesDisabledFill_AndMutedLabel()
+        public void TextRight_AnchorsRightX_WithRightAlign()
+        {
+            var buf = new SceneBuf();
+            buf.TextRight("9", rightX: 200, y: 5, RenderColor.White, scale: 2);
+            RenderText t = buf.Texts.Single();
+            Assert.Equal(200, t.X);
+            Assert.Equal(TextAlign.Right, t.Align);
+        }
+
+        [Fact]
+        public void DrawButton_DisabledUsesDisabledChrome_AndMutedLabel()
         {
             var theme = UiTheme.Default;
             var b = new UiButton("x", new UiRect(0, 0, 80, 30), "GO") { Enabled = false };
             var buf = new SceneBuf();
             buf.DrawButton(b, theme, 2);
 
-            Assert.Equal(theme.ButtonDisabled, buf.Rects[0].Color); // fill first
+            RenderSprite chrome = buf.Sprites.Single();
+            Assert.Equal("btn/disabled", chrome.Key);
+            Assert.True(chrome.NineSlice);
             RenderText label = buf.Texts.Single();
             Assert.Equal("GO", label.Text);
             Assert.Equal(theme.TextMuted, label.Color);
         }
 
         [Fact]
-        public void DrawButton_PressedUsesPressedFill()
+        public void DrawButton_PressedUsesPressedChrome()
         {
             var theme = UiTheme.Default;
             var b = new UiButton("x", new UiRect(0, 0, 80, 30), "GO") { Pressed = true };
             var buf = new SceneBuf();
             buf.DrawButton(b, theme, 2);
-            Assert.Equal(theme.ButtonPressed, buf.Rects[0].Color);
+            Assert.Equal("btn/pressed", buf.Sprites.Single().Key);
+            Assert.Equal(theme.ButtonText, buf.Texts.Single().Color);
+        }
+
+        [Fact]
+        public void DrawButton_SecondaryUsesOutlineChrome_AndAccentLabel()
+        {
+            var theme = UiTheme.Default;
+            var b = new UiButton("x", new UiRect(0, 0, 80, 30), "BACK");
+            var buf = new SceneBuf();
+            buf.DrawButton(b, theme, 2, ButtonStyle.Secondary);
+            Assert.Equal("btn/secondary", buf.Sprites.Single().Key);
+            Assert.Equal(theme.Accent, buf.Texts.Single().Color);
         }
 
         [Fact]

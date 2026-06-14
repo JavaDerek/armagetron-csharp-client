@@ -48,11 +48,10 @@ namespace Armagetron.Game.UI
         {
             int ts = L.TextScale;
             buf.Fill(new UiRect(0, 0, w, h), t.Background);
-            buf.Fill(L.Panel, t.Panel);
-            buf.Border(L.Panel, t.PanelBorder);
-            buf.TextLeft("SERVERS", L.Panel.X + 24, L.TitleY, t.Accent, L.TitleScale);
+            buf.Panel(L.Panel);
+            buf.TextLeft("SERVERS", L.Panel.X + 24, L.TitleY, t.Accent, L.TitleScale, FontRole.Title);
             buf.TextLeft("PLACEHOLDER - LIVE LIST PENDING",
-                         L.Panel.X + 24, L.TitleY + PixelFont.Height(L.TitleScale) + 6, t.TextMuted, ts);
+                         L.Panel.X + 24, L.TitleY + PixelFont.Height(L.TitleScale) + 6, t.TextMuted, ts, FontRole.Label);
 
             for (int i = 0; i < L.Rows.Length && i < servers.Count; i++)
             {
@@ -62,20 +61,20 @@ namespace Armagetron.Game.UI
 
                 // Columns are laid out to clear the JOIN button on the right; on a landscape
                 // phone there is ample width. Long names are clipped to their column.
-                int cy = row.CenterY - PixelFont.Height(ts) / 2;
+                int cy = row.CenterY;
                 int nameMax = (int)(row.W * 0.34) / PixelFont.Advance / ts;
-                buf.TextLeft(Clip(e.Name, nameMax), row.X + 12, cy, t.Text, ts);
-                buf.TextLeft(e.Region, row.X + (int)(row.W * 0.38), cy, t.TextMuted, ts);
-                buf.TextLeft(e.PlayersLabel, row.X + (int)(row.W * 0.58), cy, t.Text, ts);
-                buf.TextLeft(e.Ping + "MS", row.X + (int)(row.W * 0.70), cy, ServerList.PingColor(e.Ping, t), ts);
+                buf.TextLeftMid(Clip(e.Name, nameMax), row.X + 12, cy, t.Text, ts, FontRole.Label);
+                buf.TextLeftMid(e.Region, row.X + (int)(row.W * 0.38), cy, t.TextMuted, ts, FontRole.Label);
+                buf.TextLeftMid(e.PlayersLabel, row.X + (int)(row.W * 0.58), cy, t.Text, ts, FontRole.Mono);
+                buf.TextLeftMid(e.Ping + "MS", row.X + (int)(row.W * 0.70), cy, ServerList.PingColor(e.Ping, t), ts, FontRole.Mono);
 
                 var join = new UiButton("join" + i, L.JoinButtons[i], e.Full ? "FULL" : "JOIN")
                 { Enabled = e.Joinable && !e.Full };
                 buf.DrawButton(join, t, ts);
             }
 
-            buf.DrawButton(new UiButton("direct", L.Direct, "DIRECT CONNECT"), t, ts);
-            buf.DrawButton(new UiButton("back", L.Back, "BACK"), t, ts);
+            buf.DrawButton(new UiButton("direct", L.Direct, "DIRECT CONNECT"), t, ts, ButtonStyle.Secondary);
+            buf.DrawButton(new UiButton("back", L.Back, "BACK"), t, ts, ButtonStyle.Secondary);
         }
 
         private static string Clip(string s, int max) =>
