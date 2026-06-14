@@ -31,8 +31,8 @@ namespace Armagetron.Game.UI
 
         public AppScreen Screen { get; private set; } = AppScreen.Connect;
         public MatchState Match { get; } = new MatchState();
+        public SettingsState Settings { get; } = new SettingsState();
         public bool ExitRequested { get; private set; }
-        public bool SoundEnabled { get; private set; } = true;
 
         /// <summary>The chosen player name (used by the HUD and as the connect identity).</summary>
         public string PlayerName => _name.Value;
@@ -203,11 +203,33 @@ namespace Armagetron.Game.UI
             else if (b[1].Contains(x, y)) { _client.Disconnect(); Screen = AppScreen.Connect; }   // LEAVE
         }
 
+        private static readonly string[] ToggleIds = { "sound", "music", "haptics", "hints" };
+
         private void TapSettings(int x, int y, int w, int h)
         {
-            UiRect[] b = Layouts.Menu(w, h, 2).Buttons;
-            if (b[0].Contains(x, y)) SoundEnabled = !SoundEnabled;
-            else if (b[1].Contains(x, y)) Screen = _settingsReturn;
+            Layouts.SettingsL L = Layouts.Settings(w, h, CyclePalette.SignatureOptions.Length);
+            _name.Bounds = L.Name;
+
+            if (L.Back.Contains(x, y)) { _name.Focused = false; Screen = _settingsReturn; return; }
+
+            _host.Focused = false; _port.Focused = false;
+            _name.Focused = L.Name.Contains(x, y);
+
+            for (int i = 0; i < L.Swatches.Length; i++)
+                if (L.Swatches[i].Contains(x, y)) Settings.SignatureColor = i;
+
+            SliderHit(L.TurnZone, "turnzone", x, y);
+            SliderHit(L.Sens, "sensitivity", x, y);
+
+            for (int i = 0; i < L.Toggles.Length; i++)
+                if (L.Toggles[i].Contains(x, y)) Settings.Toggle(ToggleIds[i]);
+        }
+
+        // The slider track is thin; accept taps in a taller band around it.
+        private void SliderHit(UiRect track, string id, int x, int y)
+        {
+            if (x >= track.X && x < track.Right && y >= track.CenterY - 22 && y <= track.CenterY + 22)
+                Settings.SetSlider(id, (float)(x - track.X) / track.W);
         }
 
         // ── View ────────────────────────────────────────────────────────────────
@@ -229,18 +251,22 @@ namespace Armagetron.Game.UI
                     ConnectingView.Add(buf, _theme, Layouts.Connecting(w, h), _host.Value, _port.Value, nowMs, w, h);
                     break;
                 case AppScreen.Playing:
-                    HudView.Add(buf, _theme, Layouts.Play(w, h), _name.Value, _client.Status, Match,
-                                _toasts.Active(nowMs), nowMs, w, h);
-                    if (_touchControls) TouchOverlay.Add(buf, _theme, w, h, showHint: !_hasTurned);
+                    HudView.Add(buf, _theme, Layouts.Play(w, h), _name.Value,
+                                CyclePalette.SignatureOptions[Settings.SignatureColor],
+                                _client.Status, Match, _toasts.Active(nowMs), nowMs, w, h);
+                    if (_touchControls) TouchOverlay.Add(buf, _theme, w, h, showHint: !_hasTurned && Settings.Hints);
                     break;
                 case AppScreen.Paused:
                     MenuView.Add(buf, _theme, Layouts.Menu(w, h, 3), "PAUSED",
                                  new[] { "RESUME", "SETTINGS", "DISCONNECT" }, w, h);
                     break;
                 case AppScreen.Settings:
-                    MenuView.Add(buf, _theme, Layouts.Menu(w, h, 2), "SETTINGS",
-                                 new[] { "SOUND: " + (SoundEnabled ? "ON" : "OFF"), "BACK" }, w, h);
+                {
+                    Layouts.SettingsL L = Layouts.Settings(w, h, CyclePalette.SignatureOptions.Length);
+                    _name.Bounds = L.Name;
+                    SettingsView.Add(buf, _theme, L, _name, Settings, CyclePalette.SignatureOptions, w, h);
                     break;
+                }
                 case AppScreen.ConfirmLeave:
                     MenuView.Add(buf, _theme, Layouts.Menu(w, h, 2), "LEAVE MATCH?",
                                  new[] { "CANCEL", "LEAVE" }, w, h,

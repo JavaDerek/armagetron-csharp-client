@@ -223,7 +223,7 @@ namespace Armagetron.Protocol.Tests.Game
         }
 
         [Fact]
-        public void Settings_TogglesSound_AndBackReturns()
+        public void Settings_TogglesSound_PicksColor_Slider_AndBackReturns()
         {
             var c = new FakeUiClient();
             var s = Playing(c);
@@ -231,12 +231,19 @@ namespace Armagetron.Protocol.Tests.Game
             UiRect[] pb = Layouts.Menu(W, H, 3).Buttons;
             s.HandleTap(pb[1].CenterX, pb[1].CenterY, W, H);     // SETTINGS
             Assert.Equal(AppScreen.Settings, s.Screen);
-            Assert.True(s.SoundEnabled);
+            Assert.True(s.Settings.Sound);
 
-            UiRect[] sb = Layouts.Menu(W, H, 2).Buttons;
-            s.HandleTap(sb[0].CenterX, sb[0].CenterY, W, H);     // SOUND toggle
-            Assert.False(s.SoundEnabled);
-            s.HandleTap(sb[1].CenterX, sb[1].CenterY, W, H);     // BACK → returns to Paused
+            Layouts.SettingsL L = Layouts.Settings(W, H, CyclePalette.SignatureOptions.Length);
+            s.HandleTap(L.Toggles[0].CenterX, L.Toggles[0].CenterY, W, H);  // SOUND toggle off
+            Assert.False(s.Settings.Sound);
+
+            s.HandleTap(L.Swatches[3].CenterX, L.Swatches[3].CenterY, W, H); // pick color 3
+            Assert.Equal(3, s.Settings.SignatureColor);
+
+            s.HandleTap(L.TurnZone.X, L.TurnZone.CenterY, W, H);  // slider to far left → 0
+            Assert.Equal(0f, s.Settings.TurnZone, 2);
+
+            s.HandleTap(L.Back.CenterX, L.Back.CenterY, W, H);    // BACK → Paused
             Assert.Equal(AppScreen.Paused, s.Screen);
         }
 
@@ -364,7 +371,7 @@ namespace Armagetron.Protocol.Tests.Game
             s.HandleTap(pb[1].CenterX, pb[1].CenterY, W, H);
             Scene settings = s.BuildOverlay(W, H, 0);
             Assert.Contains(settings.Texts, t => t.Text == "SETTINGS");
-            Assert.Contains(settings.Texts, t => t.Text == "SOUND: ON");
+            Assert.Contains(settings.Texts, t => t.Text == "SOUND FX");
         }
 
         [Fact]

@@ -55,13 +55,14 @@ namespace Armagetron.Game.UI
         /// <summary>Append the in-game HUD (status corner, round banner, toasts) over the
         /// gameplay already in <paramref name="buf"/>.</summary>
         public static void Add(SceneBuf buf, UiTheme t, Layouts.PlayL L,
-                               string playerName, ConnectionStatus status, MatchState match,
+                               string playerName, RenderColor nameColor,
+                               ConnectionStatus status, MatchState match,
                                System.Collections.Generic.IReadOnlyList<Toast> toasts,
                                long now, int w, int h)
         {
             int ts = L.TextScale, m = L.Margin, line = PixelFont.Height(ts) + 6;
 
-            buf.TextLeft(playerName, m, m, CyclePalette.Mine, ts);
+            buf.TextLeft(playerName, m, m, nameColor, ts);
             buf.TextLeft("TIME " + match.TimeLabel(now), m, m + line, t.Text, ts);
             buf.TextLeft("ROUND " + match.RoundNumber + "   CYCLES " + match.CycleCount,
                          m, m + 2 * line, t.TextMuted, ts);
@@ -123,6 +124,58 @@ namespace Armagetron.Game.UI
             if (showHint)
                 buf.TextCenter("TAP LEFT / RIGHT TO TURN", w / 2, h - PixelFont.Height(ts) - 12,
                                t.Accent, ts);
+        }
+    }
+
+    public static class SettingsView
+    {
+        private static readonly string[] ToggleLabels = { "SOUND FX", "MUSIC", "HAPTICS", "HINTS" };
+
+        public static void Add(SceneBuf buf, UiTheme t, Layouts.SettingsL L,
+                               UiTextField name, SettingsState s,
+                               System.Collections.Generic.IReadOnlyList<RenderColor> swatchColors,
+                               int w, int h)
+        {
+            int ts = L.TextScale;
+            buf.Fill(new UiRect(0, 0, w, h), new RenderColor(0, 0, 0, 170));
+            buf.Fill(L.Panel, t.Panel);
+            buf.Border(L.Panel, t.PanelBorder);
+            buf.TextCenter("SETTINGS", L.Panel.CenterX, L.TitleY, t.Accent, L.TitleScale);
+
+            // Player name (left) + signature swatches (right)
+            buf.DrawField(name, t, ts);
+            buf.TextLeft("SIGNATURE COLOR", L.Swatches[0].X, L.Swatches[0].Y - PixelFont.Height(ts) - 5, t.TextMuted, ts);
+            for (int i = 0; i < L.Swatches.Length; i++)
+            {
+                buf.Fill(L.Swatches[i], swatchColors[i % swatchColors.Count]);
+                buf.Border(L.Swatches[i], i == s.SignatureColor ? t.Text : t.PanelBorder,
+                           i == s.SignatureColor ? 3 : 1);
+            }
+
+            // Sliders with live value labels
+            Label(buf, t, ts, "TURN ZONE", (int)(s.TurnZone * 100) + "%", L.TurnZone);
+            buf.DrawSlider(L.TurnZone, s.TurnZone, t);
+            Label(buf, t, ts, "SENS", s.Sensitivity.ToString("0.0"), L.Sens);
+            buf.DrawSlider(L.Sens, s.Sensitivity, t);
+
+            // Toggles (label left, pill right)
+            bool[] on = { s.Sound, s.Music, s.Haptics, s.Hints };
+            for (int i = 0; i < L.Toggles.Length; i++)
+            {
+                UiRect cell = L.Toggles[i];
+                buf.TextLeft(ToggleLabels[i], cell.X, cell.CenterY - PixelFont.Height(ts) / 2, t.Text, ts);
+                var pill = new UiRect(cell.Right - 60, cell.Y, 60, cell.H);
+                buf.DrawToggle(pill, on[i], t);
+            }
+
+            buf.DrawButton(new UiButton("back", L.Back, "BACK"), t, ts);
+        }
+
+        private static void Label(SceneBuf buf, UiTheme t, int ts, string text, string value, UiRect track)
+        {
+            int y = track.Y - PixelFont.Height(ts) - 10;
+            buf.TextLeft(text, track.X, y, t.TextMuted, ts);
+            buf.TextLeft(value, track.Right - PixelFont.MeasureWidth(value, ts), y, t.Accent, ts);
         }
     }
 

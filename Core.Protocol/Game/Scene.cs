@@ -154,6 +154,15 @@ namespace Armagetron.Game
     {
         public static readonly RenderColor Mine = new RenderColor(0x1F, 0xE3, 0xFF); // --p1 cyan (signature)
 
+        /// <summary>The 8 selectable signature colors (--p1…--p8), in the settings picker order.</summary>
+        public static readonly RenderColor[] SignatureOptions =
+        {
+            new RenderColor(0x1F, 0xE3, 0xFF), new RenderColor(0xFF, 0x9A, 0x2E),
+            new RenderColor(0xFF, 0x2F, 0xA4), new RenderColor(0x8D, 0xFF, 0x3A),
+            new RenderColor(0x3D, 0x8B, 0xFF), new RenderColor(0xFF, 0x4D, 0x4D),
+            new RenderColor(0xFF, 0xE0, 0x3A), new RenderColor(0xB9, 0x68, 0xFF),
+        };
+
         private static readonly RenderColor[] Palette =
         {
             new RenderColor(0xFF, 0x9A, 0x2E), // --p2 orange

@@ -91,6 +91,68 @@ namespace Armagetron.Game.UI
             };
         }
 
+        // ── Full settings (two-column, matching the design comp) ─────────────────
+
+        public struct SettingsL
+        {
+            public UiRect Panel, Name, Back;
+            public UiRect[] Swatches;          // 8 signature-color squares
+            public UiRect TurnZone, Sens;      // slider tracks
+            public UiRect[] Toggles;           // cells: 0 sound, 1 music, 2 haptics, 3 hints
+            public int TitleY, TextScale, TitleScale;
+        }
+
+        public static SettingsL Settings(int w, int h, int swatchCount)
+        {
+            int ts = TextScale(h), tts = TitleScale(h);
+            int pw = Math.Min((int)(w * 0.70), 700);
+            int ph = Math.Min((int)(h * 0.82), 600);
+            int px = (w - pw) / 2, py = (h - ph) / 2;
+
+            int lx = px + 36, cw = pw - 72, colGap = 28;
+            int colW = (cw - colGap) / 2, rx = lx + colW + colGap;
+            int fieldH = PixelFont.Height(ts) + 2 * SceneBuf.Pad + 6;
+            int labelH = PixelFont.Height(ts) + 6;
+
+            int y = py + PixelFont.Height(tts) + 30;
+
+            // Row 1: name (left) · signature swatches (right)
+            var name = new UiRect(lx, y + labelH, colW, fieldH);
+            int sw = (colW - 7 * 6) / swatchCount;             // 6px gaps
+            var swatches = new UiRect[swatchCount];
+            for (int i = 0; i < swatchCount; i++)
+                swatches[i] = new UiRect(rx + i * (sw + 6), y + labelH, sw, fieldH);
+
+            y += labelH + fieldH + 26;
+
+            // Row 2: two slider tracks
+            var turn = new UiRect(lx, y + labelH + fieldH / 2 - 2, colW, 4);
+            var sens = new UiRect(rx, y + labelH + fieldH / 2 - 2, colW, 4);
+            y += labelH + fieldH + 26;
+
+            // Rows 3–4: four toggles in a 2×2 grid
+            int pillW = 60, pillH = PixelFont.Height(ts) + 12;
+            var toggles = new UiRect[4];
+            for (int i = 0; i < 4; i++)
+            {
+                int col = i % 2, row = i / 2;
+                int cellX = col == 0 ? lx : rx;
+                int cellY = y + row * (pillH + 18);
+                toggles[i] = new UiRect(cellX, cellY, colW, pillH);
+            }
+            y += 2 * (pillH + 18) + 14;
+
+            var back = new UiRect(lx, py + ph - fieldH - 24, cw, fieldH + 6);
+
+            return new SettingsL
+            {
+                Panel = new UiRect(px, py, pw, ph),
+                Name = name, Swatches = swatches, TurnZone = turn, Sens = sens,
+                Toggles = toggles, Back = back,
+                TitleY = py + 22, TextScale = ts, TitleScale = tts,
+            };
+        }
+
         // ── Pause / Settings menus (shared vertical button stack) ────────────────
 
         public struct MenuL { public UiRect Panel; public UiRect[] Buttons; public int TitleY, TextScale, TitleScale; }

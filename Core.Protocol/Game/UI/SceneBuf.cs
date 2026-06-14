@@ -113,6 +113,30 @@ namespace Armagetron.Game.UI
             return this;
         }
 
+        /// <summary>A horizontal slider: track, filled portion, and a square knob at value (0–1).</summary>
+        public SceneBuf DrawSlider(UiRect track, float value01, UiTheme theme)
+        {
+            float v = value01 < 0f ? 0f : value01 > 1f ? 1f : value01;
+            int th = 4, mid = track.CenterY;
+            Fill(new UiRect(track.X, mid - th / 2, track.W, th), theme.FieldBorder);
+            int fillW = (int)(track.W * v);
+            Fill(new UiRect(track.X, mid - th / 2, fillW, th), theme.Accent);
+            int k = 14;
+            Fill(new UiRect(track.X + fillW - k / 2, mid - k / 2, k, k), theme.Accent);
+            return this;
+        }
+
+        /// <summary>An on/off toggle pill with a sliding knob (accent when on).</summary>
+        public SceneBuf DrawToggle(UiRect pill, bool on, UiTheme theme)
+        {
+            Fill(pill, on ? theme.Accent : theme.Field);
+            Border(pill, on ? theme.Accent : theme.FieldBorder);
+            int k = pill.H - 6;
+            int kx = on ? pill.Right - k - 3 : pill.X + 3;
+            Fill(new UiRect(kx, pill.Y + 3, k, k), on ? theme.Background : theme.TextMuted);
+            return this;
+        }
+
         /// <summary>Append an existing scene's draw lists (e.g. gameplay under a HUD overlay).</summary>
         public SceneBuf Append(Scene scene)
         {
