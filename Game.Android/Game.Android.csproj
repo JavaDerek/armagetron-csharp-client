@@ -24,6 +24,7 @@
          Android packages, so this single source file compiles unchanged on both. -->
     <Compile Include="..\Game.Shared\ArmagetronGame.cs" Link="Shared\ArmagetronGame.cs" />
     <Compile Include="..\Game.Shared\IShellInput.cs" Link="Shared\IShellInput.cs" />
+    <Compile Include="..\Game.Shared\Audio\MusicController.cs" Link="Shared\Audio\MusicController.cs" />
   </ItemGroup>
 
   <ItemGroup>

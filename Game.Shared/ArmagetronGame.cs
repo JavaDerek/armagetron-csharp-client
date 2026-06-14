@@ -1,4 +1,5 @@
 using System;
+using Armagetron.Game.Audio;
 using Armagetron.Game.Rendering;
 using Armagetron.Game.UI;
 using Armagetron.Protocol;
@@ -30,9 +31,10 @@ namespace Armagetron.Game
         private const int GridDivisions = 8;
 
         private readonly GraphicsDeviceManager _graphics;
-        private TextureStore  _textures = null!;
-        private TextRenderer  _text     = null!;
-        private SceneRenderer _renderer = null!;
+        private TextureStore   _textures = null!;
+        private TextRenderer   _text     = null!;
+        private SceneRenderer  _renderer = null!;
+        private MusicController _music    = null!;
 
         private readonly string _title;
         private readonly IUiClient _client;
@@ -79,6 +81,7 @@ namespace Armagetron.Game
             _textures = new TextureStore(GraphicsDevice);
             _text     = new TextRenderer();
             _renderer = new SceneRenderer(GraphicsDevice, _textures, _text);
+            _music    = new MusicController();
             EnsureView();
         }
 
@@ -109,6 +112,9 @@ namespace Armagetron.Game
             _snapshot = _client.Snapshot();
             _shell.Tick(_snapshot, _nowMs);
 
+            // Music: in-match loop while gameplay shows, menu loop otherwise; silent if toggled off.
+            _music.Update(_shell.Settings.Music, _shell.ShowsGameplay);
+
             if (_shell.ExitRequested) Exit();
 
             base.Update(gameTime);
@@ -133,6 +139,7 @@ namespace Armagetron.Game
         protected override void UnloadContent()
         {
             _client.Disconnect();
+            _music?.Dispose();
             _renderer?.Dispose();
             _text?.Dispose();
             _textures?.Dispose();

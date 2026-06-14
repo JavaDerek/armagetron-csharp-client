@@ -11,7 +11,7 @@ namespace Armagetron.Game.UI
     public sealed class SettingsState
     {
         public bool Sound { get; set; } = true;
-        public bool Music { get; set; }
+        public bool Music { get; set; } = true;
         public bool Haptics { get; set; } = true;
         public bool Hints { get; set; } = true;
 

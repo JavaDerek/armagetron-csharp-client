@@ -14,7 +14,7 @@
              Link="media\fonts\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="$(MSBuildThisFileDirectory)..\media\splash\splash_1080.png"
              Link="media\splash\splash_1080.png" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="$(MSBuildThisFileDirectory)..\media\audio\music\*.mp3"
+    <Content Include="$(MSBuildThisFileDirectory)..\media\audio\music\*.ogg"
              Link="media\audio\music\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
