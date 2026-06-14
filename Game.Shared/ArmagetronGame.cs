@@ -22,6 +22,10 @@ namespace Armagetron.Game
         private const float ArenaMargin = 10f;
         private const int   WindowSize  = 800;
 
+        // PLACEHOLDER floor grid (DESIGN_BRIEF §6) until the designer's arena texture lands.
+        private static readonly RenderColor GridColor = new RenderColor(28, 28, 44);
+        private const int GridDivisions = 8;
+
         private readonly GraphicsDeviceManager _graphics;
         private SpriteBatch _spriteBatch = null!;
         private Texture2D   _pixel       = null!;
@@ -112,7 +116,8 @@ namespace Armagetron.Game
 
             if (_shell.ShowsGameplay)
             {
-                Scene game = SceneBuilder.Build(_snapshot, _client.MyCycleId, _view, _palette);
+                Scene game = SceneBuilder.BuildWithArt(_snapshot, _client.MyCycleId, _view, _palette,
+                                                       GridColor, GridDivisions);
                 DrawScene(game, _offsetX, _offsetY);
             }
 

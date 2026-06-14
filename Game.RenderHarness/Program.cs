@@ -100,7 +100,8 @@ namespace Armagetron.Game.RenderHarness
             w.MoveLocalCycle(5, new Vec2(90, 12), new Vec2(1, 0));
 
             var view = new ArenaView(arenaSize: topWall, margin: 10f, viewSize: Size);
-            return SceneBuilder.Build(w.Snapshot(nowMs: 9_999), w.MyCycleId, view, new CyclePalette());
+            return SceneBuilder.BuildWithArt(w.Snapshot(nowMs: 9_999), w.MyCycleId, view,
+                                             new CyclePalette(), new RenderColor(28, 28, 44), divisions: 8);
         }
 
         /// <summary>Exercises every placeholder glyph so the font can be eyeballed.</summary>

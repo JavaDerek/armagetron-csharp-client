@@ -85,6 +85,23 @@ namespace Armagetron.Game
                 new RenderSegment(bl, tl, color),
             };
         }
+
+        /// <summary>
+        /// PLACEHOLDER floor grid: <paramref name="divisions"/>−1 evenly-spaced lines on each
+        /// axis across the arena, drawn thin. Stands in for the designer's arena-floor texture
+        /// (DESIGN_BRIEF §6) — swapped for a tiled sprite later; the projection stays the same.
+        /// </summary>
+        public RenderSegment[] Grid(RenderColor color, int divisions)
+        {
+            var list = new List<RenderSegment>();
+            for (int i = 1; i < divisions; i++)
+            {
+                float t = ArenaSize * i / divisions;
+                list.Add(new RenderSegment(ToScreen(new Vec2(t, 0)), ToScreen(new Vec2(t, ArenaSize)), color, 1f));
+                list.Add(new RenderSegment(ToScreen(new Vec2(0, t)), ToScreen(new Vec2(ArenaSize, t)), color, 1f));
+            }
+            return list.ToArray();
+        }
     }
 
     /// <summary>
@@ -188,6 +205,38 @@ namespace Armagetron.Game
                     AppendCycle(c, CyclePalette.Mine, view, segments, heads);
 
             return new Scene(segments, heads);
+        }
+
+        /// <summary>
+        /// Like <see cref="Build"/> but with PLACEHOLDER in-game art layered in: a faint floor
+        /// grid UNDER everything and a short directional "nose" on each cycle head so heading is
+        /// visible. Stands in for the designer's arena-floor texture + cycle sprite
+        /// (DESIGN_BRIEF §6); when those land this becomes a sprite draw and the geometry here
+        /// is retired. Kept separate from <see cref="Build"/> so the core geometry contract (and
+        /// its tests) is untouched.
+        /// </summary>
+        public static Scene BuildWithArt(CycleSnapshot[] cycles, int myId, ArenaView view,
+                                         CyclePalette palette, RenderColor gridColor, int divisions)
+        {
+            Scene baseScene = Build(cycles, myId, view, palette);
+
+            var segments = new List<RenderSegment>();
+            segments.AddRange(view.Grid(gridColor, divisions));   // floor first (drawn underneath)
+            segments.AddRange(baseScene.Segments);
+
+            const float noseLen = 5f; // world units
+            foreach (var c in cycles)
+            {
+                double mag = Math.Sqrt(c.Direction.X * c.Direction.X + c.Direction.Y * c.Direction.Y);
+                if (mag < 1e-4) continue;
+                RenderColor color = c.CycleId == myId ? CyclePalette.Mine : palette.ColorFor(c.CycleId, myId);
+                var tip = new Vec2(
+                    c.Position.X + (float)(c.Direction.X / mag) * noseLen,
+                    c.Position.Y + (float)(c.Direction.Y / mag) * noseLen);
+                segments.Add(new RenderSegment(view.ToScreen(c.Position), view.ToScreen(tip), color, 3f));
+            }
+
+            return new Scene(segments, baseScene.Heads, baseScene.Texts);
         }
 
         private static void AppendCycle(CycleSnapshot cycle, RenderColor color, ArenaView view,
