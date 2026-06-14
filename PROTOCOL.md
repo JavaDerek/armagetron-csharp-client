@@ -258,14 +258,66 @@ until at least one desc=20 block has arrived. Send it once per session.
   server then created our cycle (desc=220, name='AaBot'), sent our cycle's position syncs, and
   accepted our desc=321 turns for ~58 s with no disconnect.
 
-This before/after isolates the cause to the id-reservation requirement alone; position, timing,
-and desc=311 priming were ruled out as irrelevant by earlier experiments.
+This before/after isolates the id-reservation requirement as **necessary**. It is **not
+sufficient**, however — see the name-gate finding below.
+
+### The "cheating" gate is ALSO server-side and NAME-dependent (2026-06-13)
+
+A reserved id is necessary but does not guarantee acceptance. Controlled live runs against the
+`.61` listen server (current client, single 40-id block, id = block max, desc=201 sent ~1.1 s
+after login — i.e. structurally identical to the real client) show the outcome is **determined
+by the player name**, not by our packet bytes:
+
+| Name (at LoginAccepted `status=1`) | desc=201 | Outcome |
+|---|---|---|
+| `AaBot`  (used many times in this project) | valid reserved id | **Playing** |
+| `Vlad`, `lVda`, `aAoB` (previously used)   | valid reserved id | Playing (mostly) |
+| `Mt8420`, `Bp9135`, `Qx5537`, `Zr6635` (freshly invented) | valid reserved id | **cheating, 3/3** |
+
+Key facts that pin this to the **name**, not the bytes:
+- Our client is deterministic, yet the *same* code/packet yields Playing for `AaBot` and
+  cheating for a fresh name in back-to-back runs.
+- `AaBot` is **not** a live ghost being re-associated: the server sends `desc=220 name='AaBot'`
+  *after* our desc=201 (a fresh server-side object), so this is a **persisted/trusted name
+  record** on the server, not live-object reuse.
+- Therefore the earlier "registration timing race" framing was wrong. The discriminator is a
+  server-side name trust/persistence check (likely tied to auth / access-level / players db).
+  A brand-new unknown name creating its own ePlayerNetID trips `Cheater()`; a known name does not.
+
+**Practical consequence:** the client cannot make an *unknown* name register from the wire alone
+(no client-side fix exists — it is the server's decision). Live verification therefore uses a
+known name (`AaBot`). Authenticating fresh names would require a real desc=204 auth credential.
+
+### LoginAccepted (desc=5) `status` word selects the join path
+
+word[0] of desc=5 = join status: **`1`** = clean join — the server reserves ids (desc=20) and the
+client may register (desc=201) immediately. **`2`/`3`** = mid-round join — no reservation is
+granted at login; the server defers it to the next round, so the client must keep requesting
+(re-send desc=21) until a block arrives.
+
+### Real-client C→S desc=201 layout (21 words, PCAP-confirmed)
+
+`[0]`=reserved id (block max) · `[1]`=player slot (1–2 observed) · `[2]`=15 · `[3]`=7 or 15 ·
+`[4]`=0 · `[5]`=1000 · `[6]`=name length · `[7..]`=name (byte-swapped within words) · pad to
+`[17]` · **`[18]`=small per-registration counter (observed 2,3,4 — NOT a cycle id)** · `[19]`=0 ·
+`[20]`=0. Our client writes `[18]`=`_myCycleId` (=`0xFFFF` at registration, since the server
+assigns our cycle only afterwards); this is technically wrong but is **not** the cheat trigger —
+`AaBot` registers successfully with `0xFFFF` there.
+
+### Real-client registration timing (PCAP-confirmed)
+
+The real client sends desc=201 **~1.1 s after login**, right after the initial scene dump and a
+desc=311 priming burst (`10,20,30,35,40,50` — identical to our `SpeedSyncValues`). It does **not**
+wait for a round boundary. Our client now mirrors this: arm registration on a ~500 ms post-login
+timer once a reservation exists, rather than gating on a desc=24 `value==7` round-start.
 
 ### Notes
 
-- The server sends a fresh desc=20 block roughly each time it receives a desc=21; a client that
-  re-sends desc=21 (e.g. as part of a keepalive) accumulates multiple blocks. One block is
-  enough — request once if possible, but consuming from a growing pool also works.
+- The server sends a fresh desc=20 block roughly each time it receives a desc=21; re-sending
+  desc=21 (e.g. as a keepalive) accumulates multiple blocks. **Request ONE block and register
+  from its top.** Allocating from a *later* accumulated block's max is a non-top id; the client
+  now stops sending desc=21 once it holds a block (but keeps asking while it has none, for the
+  mid-round `status=2/3` path).
 - desc=21 body **must** be non-zero (40 observed). Zero reserves nothing and later spawn fails.
 
 ## nNetObject — RESOLVED

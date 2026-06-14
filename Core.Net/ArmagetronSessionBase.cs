@@ -74,6 +74,8 @@ namespace Armagetron.Net
         private bool _registrationRejected = false; // server sent desc=3 "cheating" after our desc=201
         private int  _myPlayerNetObjId     = -1;
 
+        private long _registrationArmTick  = 0;     // earliest tick to begin priming after login
+
         // netObject ID reservation pool (desc=20 reply → desc=201 allocation)
         private readonly SortedSet<int> _reservedIds = new SortedSet<int>();
 
@@ -132,6 +134,7 @@ namespace Armagetron.Net
             if (data != null) HandlePacket(data);
             else              HandleIdle();
 
+            MaybeBeginRegistration();
             if (_speedSyncStep >= 0) MaybeSpeedSync();
             if (_state == State.Playing) MaybeSendCycleCommand();
         }
@@ -315,6 +318,11 @@ namespace Armagetron.Net
             {
                 _state = State.Connected;
                 SendReadySync();
+                // Arm registration on a short timer — the real client sends desc=201 ~1.1s
+                // after login (≈0.5s after the initial scene dump), NOT keyed to a round
+                // boundary. Gating on a round-start (desc=24 value==7) delayed our desc=201
+                // to a random round phase and triggered an extra reservation block.
+                _registrationArmTick = Tick() + 500;
                 if (status != 1) Log($"  Mid-round join (status={status}), waiting for spawn…");
             }
         }
@@ -335,13 +343,6 @@ namespace Armagetron.Net
                     _turns = 0; _posInitialized = false;
                     Log("  → new round detected — awaiting spawn pos from desc=24 27w");
                     OnRoundStart();
-
-                    if (!_playerObjectSent && _speedSyncStep < 0)
-                    {
-                        _speedSyncStep     = 0;
-                        _nextSpeedSyncTick = Tick() + 100;
-                        Log($"  → starting desc=311 priming (cycle={_myCycleId})");
-                    }
                 }
             }
             else if (CycleStateSync.TryDecodeFull(msg, out var sync))
@@ -498,6 +499,23 @@ namespace Armagetron.Net
             SendReliable(new NetMessage(27, mid, w.ToArray()));
         }
 
+        /// <summary>
+        /// Begin the desc=311 priming → desc=201 registration sequence once the post-login
+        /// timer has elapsed and the server has reserved at least one id block. Mirrors the
+        /// real client, which registers shortly after login independent of the round phase.
+        /// One-shot: only arms the priming sequence; <see cref="MaybeSpeedSync"/> drives it.
+        /// </summary>
+        private void MaybeBeginRegistration()
+        {
+            if (_playerObjectSent || _speedSyncStep >= 0) return;
+            if (_registrationArmTick == 0 || Tick() < _registrationArmTick) return;
+            if (_reservedIds.Count == 0) return;
+
+            _speedSyncStep     = 0;
+            _nextSpeedSyncTick = Tick() + 100;
+            Log("  → arming desc=311 priming → registration (post-login timer elapsed)");
+        }
+
         private void MaybeSpeedSync()
         {
             if (_speedSyncStep < 0 || _speedSyncStep >= SpeedSyncValues.Length) return;
@@ -599,11 +617,21 @@ namespace Armagetron.Net
 
         protected void SendReadySync()
         {
-            var w21 = new MessageWriter();
-            w21.WriteUInt16(0x0028);
-            int mid21 = _session.NextReliableId();
-            SendReliableDouble(new NetMessage(21, mid21, w21.ToArray()));
-            Log($"→ desc=21 mid={mid21}");
+            // desc=21 (id reservation) is requested until the server grants a block, then
+            // never again. The real client requests a single 40-id block at login and
+            // registers from its top; once we hold a block we must stop, because allocating
+            // from a later accumulated block's max would be a non-top id. But a mid-round
+            // join (LoginAccepted status≠1) gets no block at login — the server defers it to
+            // the next round — so we keep asking (via keepalive) until one arrives.
+            // desc=25/desc=28 still go out on every ready-sync as the keepalive.
+            if (_reservedIds.Count == 0 && !_playerObjectSent)
+            {
+                var w21 = new MessageWriter();
+                w21.WriteUInt16(0x0028);
+                int mid21 = _session.NextReliableId();
+                SendReliableDouble(new NetMessage(21, mid21, w21.ToArray()));
+                Log($"→ desc=21 mid={mid21}");
+            }
 
             int mid25 = _session.NextReliableId();
             SendReliableDouble(new NetMessage(25, mid25, Array.Empty<byte>()));
