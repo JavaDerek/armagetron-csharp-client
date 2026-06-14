@@ -364,6 +364,44 @@ namespace Armagetron.Protocol.Tests.Game
         }
 
         [Fact]
+        public void RoundStartEvent_ShowsBanner_AndToast()
+        {
+            var c = new FakeUiClient();
+            var s = Playing(c);
+            c.Events.Enqueue(MatchEvent.RoundStart);
+            s.Tick(Array.Empty<CycleSnapshot>(), 1_000);
+            // Within the first 2.5s a "ROUND 1" banner + a "ROUND 1" toast both show.
+            Scene scene = s.BuildOverlay(W, H, 1_500);
+            Assert.Contains(scene.Texts, t => t.Text == "ROUND 1");
+        }
+
+        [Fact]
+        public void RoundEndEvent_ShowsRoundOverBanner()
+        {
+            var c = new FakeUiClient();
+            var s = Playing(c);
+            c.Events.Enqueue(MatchEvent.RoundStart);
+            s.Tick(Array.Empty<CycleSnapshot>(), 0);
+            c.Events.Enqueue(MatchEvent.RoundEnd);
+            s.Tick(Array.Empty<CycleSnapshot>(), 1_000);
+            Scene scene = s.BuildOverlay(W, H, 1_100);
+            Assert.Contains(scene.Texts, t => t.Text == "ROUND OVER");
+        }
+
+        [Fact]
+        public void LocalDiedEvent_ShowsCrashToast()
+        {
+            var c = new FakeUiClient();
+            var s = Playing(c);
+            c.Events.Enqueue(MatchEvent.RoundStart);
+            s.Tick(Array.Empty<CycleSnapshot>(), 0);
+            c.Events.Enqueue(MatchEvent.LocalDied);
+            s.Tick(Array.Empty<CycleSnapshot>(), 500);
+            Scene scene = s.BuildOverlay(W, H, 600);
+            Assert.Contains(scene.Texts, t => t.Text == "YOU CRASHED");
+        }
+
+        [Fact]
         public void ShowsGameplay_OnlyInPlayingOrPaused()
         {
             var c = new FakeUiClient();

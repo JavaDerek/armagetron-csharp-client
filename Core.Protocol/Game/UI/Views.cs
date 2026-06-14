@@ -52,9 +52,11 @@ namespace Armagetron.Game.UI
 
     public static class HudView
     {
-        /// <summary>Append the in-game HUD over the gameplay already in <paramref name="buf"/>.</summary>
+        /// <summary>Append the in-game HUD (status corner, round banner, toasts) over the
+        /// gameplay already in <paramref name="buf"/>.</summary>
         public static void Add(SceneBuf buf, UiTheme t, Layouts.PlayL L,
                                string playerName, ConnectionStatus status, MatchState match,
+                               System.Collections.Generic.IReadOnlyList<Toast> toasts,
                                long now, int w, int h)
         {
             int ts = L.TextScale, m = L.Margin, line = PixelFont.Height(ts) + 6;
@@ -74,9 +76,26 @@ namespace Armagetron.Game.UI
             // Placeholder pause glyph "II" until the designer's pause icon arrives (DESIGN_BRIEF §8).
             buf.DrawButton(new UiButton("pause", L.Pause, "II"), t, ts);
 
+            // Round banner: a big centred announcement at round start / round over. NB a true
+            // pre-round 3·2·1 countdown needs the desc=24 negative game_time decode (PROTOCOL.md
+            // open item); until then this is an honest round-start/over banner placeholder.
+            int bannerY = h / 4;
+            if (match.RoundActive && match.ElapsedMs(now) < 2_500)
+                buf.TextCenter("ROUND " + match.RoundNumber, w / 2, bannerY, t.Accent, ts * 3);
+            else if (!match.RoundActive && match.RoundNumber > 0)
+                buf.TextCenter("ROUND OVER", w / 2, bannerY, t.Text, ts * 3);
+
             if (!match.LocalAlive)
                 buf.TextCenter("WAITING FOR NEXT ROUND", w / 2, h / 2 - PixelFont.Height(ts) / 2,
                                t.TextMuted, ts);
+
+            // Toast stack: newest at the bottom, older ones rising above it.
+            int toastY = (int)(h * 0.72);
+            for (int i = toasts.Count - 1; i >= 0; i--)
+            {
+                buf.TextCenter(toasts[i].Text, w / 2, toastY, toasts[i].Color, ts);
+                toastY -= PixelFont.Height(ts) + 8;
+            }
         }
     }
 

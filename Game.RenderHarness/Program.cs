@@ -51,7 +51,6 @@ namespace Armagetron.Game.RenderHarness
                 shell.HandleTap(conn.CenterX, conn.CenterY, Size, Size); // → Connecting
                 client.Status = ConnectionStatus.Connected;
                 shell.Tick(Array.Empty<CycleSnapshot>(), now);          // → Playing
-                shell.OnRoundStart(0);
             }
 
             switch (name)
@@ -60,7 +59,10 @@ namespace Armagetron.Game.RenderHarness
                     shell.HandleTap(conn.CenterX, conn.CenterY, Size, Size);
                     break;
                 case "playing":
-                    StartPlaying(); now = 65_000;
+                    StartPlaying();
+                    client.Events.Enqueue(MatchEvent.RoundStart);       // banner + toast
+                    shell.Tick(Array.Empty<CycleSnapshot>(), 1_200);
+                    now = 1_200;
                     break;
                 case "paused":
                     StartPlaying(); shell.OnBack();
@@ -130,7 +132,13 @@ namespace Armagetron.Game.RenderHarness
         public void Disconnect() => Status = ConnectionStatus.Idle;
         public void TurnLeft() { }
         public void TurnRight() { }
-        public IReadOnlyList<MatchEvent> DrainEvents() => Array.Empty<MatchEvent>();
+        public readonly Queue<MatchEvent> Events = new Queue<MatchEvent>();
+        public IReadOnlyList<MatchEvent> DrainEvents()
+        {
+            var list = new List<MatchEvent>(Events);
+            Events.Clear();
+            return list;
+        }
     }
 
     internal sealed class HarnessGame : Microsoft.Xna.Framework.Game

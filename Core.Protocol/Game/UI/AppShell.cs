@@ -27,6 +27,8 @@ namespace Armagetron.Game.UI
         private bool _hasTurned;
         private AppScreen _settingsReturn = AppScreen.Connect;
 
+        private readonly ToastQueue _toasts = new ToastQueue();
+
         public AppScreen Screen { get; private set; } = AppScreen.Connect;
         public MatchState Match { get; } = new MatchState();
         public bool ExitRequested { get; private set; }
@@ -61,9 +63,18 @@ namespace Armagetron.Game.UI
             {
                 switch (ev)
                 {
-                    case MatchEvent.RoundStart: Match.OnRoundStart(nowMs); break;
-                    case MatchEvent.RoundEnd:   Match.OnRoundEnd(); break;
-                    case MatchEvent.LocalDied:  Match.OnLocalDied(); break;
+                    case MatchEvent.RoundStart:
+                        Match.OnRoundStart(nowMs);
+                        _toasts.Push("ROUND " + Match.RoundNumber, _theme.Accent, nowMs);
+                        break;
+                    case MatchEvent.RoundEnd:
+                        Match.OnRoundEnd();
+                        _toasts.Push("ROUND OVER", _theme.Text, nowMs);
+                        break;
+                    case MatchEvent.LocalDied:
+                        Match.OnLocalDied();
+                        _toasts.Push("YOU CRASHED", _theme.Danger, nowMs);
+                        break;
                 }
             }
 
@@ -207,7 +218,8 @@ namespace Armagetron.Game.UI
                     ConnectingView.Add(buf, _theme, Layouts.Connecting(w, h), _host.Value, _port.Value, nowMs, w, h);
                     break;
                 case AppScreen.Playing:
-                    HudView.Add(buf, _theme, Layouts.Play(w, h), _name.Value, _client.Status, Match, nowMs, w, h);
+                    HudView.Add(buf, _theme, Layouts.Play(w, h), _name.Value, _client.Status, Match,
+                                _toasts.Active(nowMs), nowMs, w, h);
                     if (_touchControls) TouchOverlay.Add(buf, _theme, w, h, showHint: !_hasTurned);
                     break;
                 case AppScreen.Paused:
