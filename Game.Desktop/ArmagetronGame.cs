@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
-using System.Threading;
-using Armagetron.Net;
+using Armagetron.Lib;
 using Armagetron.Protocol;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -10,9 +8,11 @@ using Microsoft.Xna.Framework.Input;
 namespace Armagetron.Game
 {
     /// <summary>
-    /// MonoGame host for the Armagetron desktop client.
-    /// Runs the protocol session on a background thread and renders the game world
-    /// on the main thread at 60 Hz.
+    /// MonoGame host for the Armagetron desktop client. It is now a pure front-end over the
+    /// ArmaLib <see cref="ArmaClient"/> facade: it reads keyboard input and forwards turns,
+    /// pulls a render-ready snapshot each frame, and draws it. All networking, the session
+    /// loop thread, and every protocol primitive live inside ArmaClient — this class never
+    /// sees them.
     /// </summary>
     public sealed class ArmagetronGame : Microsoft.Xna.Framework.Game
     {
@@ -28,9 +28,7 @@ namespace Armagetron.Game
 
         private readonly string _title;
 
-        private readonly GameWorld    _world;
-        private readonly PlayerSession _session;
-        private Thread?               _sessionThread;
+        private readonly ArmaClient _client;
 
         private KeyboardState _prevKeys;
 
@@ -40,16 +38,14 @@ namespace Armagetron.Game
         private readonly CyclePalette _palette = new CyclePalette();
 
         /// <summary>
-        /// Construct with a session that has ALREADY registered (reached Playing) on the
-        /// caller's uncontended thread — see <see cref="PlayerSession.RunUntilPlaying"/>.
-        /// The render loop here would starve the registration race if it ran first, so
-        /// registration is done before this object exists; we only continue the loop.
+        /// Construct with a client that has ALREADY connected+registered (see
+        /// <see cref="ArmaClient.Connect"/>). The facade is driving its own background
+        /// session loop by the time this window opens; we only render and feed it input.
         /// </summary>
-        public ArmagetronGame(PlayerSession session, GameWorld world, string title)
+        public ArmagetronGame(ArmaClient client, string title)
         {
-            _session = session;
-            _world   = world;
-            _title   = title;
+            _client = client;
+            _title  = title;
 
             _graphics = new GraphicsDeviceManager(this);
             _graphics.PreferredBackBufferWidth  = ViewSize;
@@ -58,25 +54,9 @@ namespace Armagetron.Game
             IsMouseVisible = true;
         }
 
-        protected override void Initialize()
-        {
-            Window.Title = _title;
-
-            // Registration already happened on the main thread; just keep the session
-            // pumping for the gameplay phase. Render contention now only affects
-            // dead-reckoning/turns, which tolerate it (unlike one-shot registration).
-            _sessionThread = new Thread(() => _session.RunLoop())
-            {
-                IsBackground = true,
-                Name         = "ProtocolThread",
-            };
-            _sessionThread.Start();
-
-            base.Initialize();
-        }
-
         protected override void LoadContent()
         {
+            Window.Title = _title;
             _spriteBatch = new SpriteBatch(GraphicsDevice);
             _pixel       = new Texture2D(GraphicsDevice, 1, 1);
             _pixel.SetData(new[] { Color.White });
@@ -88,10 +68,8 @@ namespace Armagetron.Game
 
             if (keys.IsKeyDown(Keys.Escape)) Exit();
 
-            if (IsNewPress(keys, _prevKeys, Keys.Left))
-                _session.QueueTurn(TurnDirection.Left);
-            if (IsNewPress(keys, _prevKeys, Keys.Right))
-                _session.QueueTurn(TurnDirection.Right);
+            if (IsNewPress(keys, _prevKeys, Keys.Left))  _client.TurnLeft();
+            if (IsNewPress(keys, _prevKeys, Keys.Right)) _client.TurnRight();
 
             _prevKeys = keys;
             base.Update(gameTime);
@@ -102,10 +80,10 @@ namespace Armagetron.Game
             GraphicsDevice.Clear(Color.Black);
             _spriteBatch.Begin();
 
-            // Dead-reckon remote cycles to "now" so they move smoothly between sparse syncs,
-            // then let the pure model decide everything; here we only issue the GPU calls.
-            CycleSnapshot[] cycles = _world.Snapshot(Environment.TickCount64);
-            Scene scene = SceneBuilder.Build(cycles, _world.MyCycleId, _view, _palette);
+            // The facade hands back cycles already dead-reckoned to "now"; the pure model
+            // decides everything else. Here we only issue the GPU calls.
+            CycleSnapshot[] cycles = _client.Snapshot();
+            Scene scene = SceneBuilder.Build(cycles, _client.MyCycleId, _view, _palette);
 
             foreach (RenderSegment seg in scene.Segments)
                 DrawLine(ToVec(seg.From), ToVec(seg.To), ToXna(seg.Color), seg.Thickness);
@@ -141,9 +119,7 @@ namespace Armagetron.Game
 
         protected override void UnloadContent()
         {
-            _session.RequestStop();
-            _sessionThread?.Join(millisecondsTimeout: 1000);
-            _session.Dispose();
+            _client.Disconnect();
             _pixel?.Dispose();
             _spriteBatch?.Dispose();
             base.UnloadContent();

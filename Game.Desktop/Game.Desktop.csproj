@@ -14,8 +14,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Core.Protocol\Core.Protocol.csproj" />
-    <ProjectReference Include="..\Core.Net\Core.Net.csproj" />
+    <!-- The desktop client talks to the server ONLY through the ArmaLib facade; it no
+         longer references the session/protocol primitives directly. ArmaLib transitively
+         brings in Core.Protocol's render model (GameWorld snapshot, Scene, ArenaView). -->
+    <ProjectReference Include="..\ArmaLib\ArmaLib.csproj" />
   </ItemGroup>
 
 </Project>

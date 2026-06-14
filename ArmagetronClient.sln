@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Game.Desktop", "Game.Deskto
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Game.RenderHarness", "Game.RenderHarness\Game.RenderHarness.csproj", "{94CFFF76-5097-4331-971E-8848C7F6702A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArmaLib", "ArmaLib\ArmaLib.csproj", "{71563AC6-F261-4F2D-8AFF-1F0076B3A98B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -97,6 +99,18 @@ Global
 		{94CFFF76-5097-4331-971E-8848C7F6702A}.Release|x64.Build.0 = Release|Any CPU
 		{94CFFF76-5097-4331-971E-8848C7F6702A}.Release|x86.ActiveCfg = Release|Any CPU
 		{94CFFF76-5097-4331-971E-8848C7F6702A}.Release|x86.Build.0 = Release|Any CPU
+		{71563AC6-F261-4F2D-8AFF-1F0076B3A98B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{71563AC6-F261-4F2D-8AFF-1F0076B3A98B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{71563AC6-F261-4F2D-8AFF-1F0076B3A98B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{71563AC6-F261-4F2D-8AFF-1F0076B3A98B}.Debug|x64.Build.0 = Debug|Any CPU
+		{71563AC6-F261-4F2D-8AFF-1F0076B3A98B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{71563AC6-F261-4F2D-8AFF-1F0076B3A98B}.Debug|x86.Build.0 = Debug|Any CPU
+		{71563AC6-F261-4F2D-8AFF-1F0076B3A98B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{71563AC6-F261-4F2D-8AFF-1F0076B3A98B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{71563AC6-F261-4F2D-8AFF-1F0076B3A98B}.Release|x64.ActiveCfg = Release|Any CPU
+		{71563AC6-F261-4F2D-8AFF-1F0076B3A98B}.Release|x64.Build.0 = Release|Any CPU
+		{71563AC6-F261-4F2D-8AFF-1F0076B3A98B}.Release|x86.ActiveCfg = Release|Any CPU
+		{71563AC6-F261-4F2D-8AFF-1F0076B3A98B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

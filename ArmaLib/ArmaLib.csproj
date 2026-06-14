@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ArmaLib is the beginner-friendly SDK facade over Core.Protocol + Core.Net.
+       Same engine-agnostic rules as the other Core libs (netstandard2.1, no engine
+       deps) so the desktop, Android, universal, and Oculus clients can all compose on
+       top of it. The protocol primitives (descriptor IDs, REAL encoding, netobject IDs,
+       priming sequence) stay hidden below this facade. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>Armagetron.Lib</RootNamespace>
+    <AssemblyName>Armagetron.Lib</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Core.Protocol\Core.Protocol.csproj" />
+    <ProjectReference Include="..\Core.Net\Core.Net.csproj" />
+  </ItemGroup>
+
+</Project>

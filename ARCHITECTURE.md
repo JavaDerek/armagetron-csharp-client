@@ -19,7 +19,8 @@ Unity. C# reaches iPhone *and* lets the exact same core compile inside Unity.
 
 ```
 Core.Protocol   (netstandard2.1, pure C#)  framing, REAL float, codec, message decoders   [shared by ALL]
-Core.Game       (netstandard2.1, pure C#)  cycle/wall/arena model + client-side simulation  [shared by ALL]
+Core.Net        (netstandard2.1, pure C#)  UDP link + reliable session + protocol state machine
+ArmaLib         (netstandard2.1, pure C#)  beginner-friendly SDK facade over the two above
   ├── Client.MonoGame   flat client: desktop / Android / iPhone (1st & 3rd person)
   ├── Client.Unity      Quest VR: first-person, stereo (references the SAME core)
   └── (server / bot / tools, headless)
@@ -27,6 +28,23 @@ Core.Game       (netstandard2.1, pure C#)  cycle/wall/arena model + client-side 
 
 The hard-won, language-neutral knowledge (the protocol) is implemented **once**
 in the core. Each presentation is a thin shell on top.
+
+### ArmaLib — the front-end SDK facade
+
+Front-ends should never touch a protocol primitive. **ArmaLib** (`Armagetron.Lib`)
+is the single seam they program against, so the desktop, Android, universal, and
+Oculus clients all compose on top of one foundation instead of re-implementing
+protocol handling:
+
+- **In:** `Connect(host, port, name)`, `TurnLeft()`, `TurnRight()`, `Disconnect()`.
+- **Out:** `Snapshot()` (render-ready cycles, already dead-reckoned), `MyCycleId`,
+  and events `Spawned`, `Died`, `RoundStarted`, `RoundEnded`, `CyclesChanged`.
+- **Hidden below the line:** descriptor IDs, REAL encoding, netobject-id reservation,
+  the desc=311 priming sequence, the desc=201 registration race + fresh-socket retry,
+  and the background session-loop thread.
+
+`ArmaClient` owns the I/O lifecycle (verified by the live-server gate, like `UdpLink`);
+the pure event-derivation it sits on — `GameEventTracker` — is fully unit-tested.
 
 ## The six rules that keep the core "Unity-droppable"
 

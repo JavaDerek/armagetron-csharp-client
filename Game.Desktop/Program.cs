@@ -1,6 +1,6 @@
 using System;
 using Armagetron.Game;
-using Armagetron.Net;
+using Armagetron.Lib;
 
 string host = "192.168.68.61";
 int    port = 4534;
@@ -15,38 +15,19 @@ for (int i = 0; i < args.Length; i++)
 
 Console.WriteLine($"[AaClient] Connecting to {host}:{port} as '{name}'");
 
-// Registration (desc=201) is a one-shot, timing-sensitive race against the server. It
-// must run on an uncontended thread BEFORE the MonoGame render loop starts — a render-
-// starved background thread loses the race and draws an "It assumed you are cheating"
-// disconnect (verified live: bot on main thread 2/2 ok, on a busy background thread 2/3
-// rejected). So we connect+register here, on the main thread, before opening the window.
-// On timeout we reconnect with a FRESH socket, which also escapes the server's
-// post-rejection mute (a new connection gets a new slot).
-var world = new GameWorld();
-PlayerSession? session = null;
-
-const int maxAttempts = 10;
-for (int attempt = 1; attempt <= maxAttempts; attempt++)
+// Everything below the wire — login, the desc=201 registration race, fresh-socket retry,
+// and the background session loop — now lives inside ArmaClient. Connect() runs the
+// timing-sensitive registration on THIS (uncontended) thread before the render loop opens,
+// then hands the session to a background thread; see ArmaClient.Connect for why.
+var client = new ArmaClient();
+Console.WriteLine("[AaClient] Registering…");
+if (!client.Connect(host, port, name))
 {
-    var link = new UdpLink(host, port);
-    var candidate = new PlayerSession(link, name, world);
-    Console.WriteLine($"[AaClient] Registering… (attempt {attempt}/{maxAttempts})");
-    if (candidate.RunUntilPlaying(timeoutMs: 45_000))
-    {
-        session = candidate;
-        Console.WriteLine("[AaClient] Registered — entering game.");
-        break;
-    }
-    Console.WriteLine("[AaClient] Registration timed out/rejected; reconnecting with a fresh socket…");
-    candidate.Dispose();
-}
-
-if (session == null)
-{
-    Console.WriteLine($"[AaClient] Could not register after {maxAttempts} attempts. Exiting.");
+    Console.WriteLine("[AaClient] Could not register. Exiting.");
     return;
 }
+Console.WriteLine("[AaClient] Registered — entering game.");
 
 string title = $"Armagetron — {host}:{port}  [{name}]  ← → to turn  Esc to quit";
-using var game = new ArmagetronGame(session, world, title);
+using var game = new ArmagetronGame(client, title);
 game.Run();
