@@ -19,7 +19,7 @@ namespace Armagetron.Game.UI
 
         public struct ConnectL
         {
-            public UiRect Panel, Host, Port, Name, Connect, Settings;
+            public UiRect Panel, Host, Port, Name, Connect, Browse, Settings;
             public int TitleY, SubY, ErrorY, TextScale, TitleScale;
         }
 
@@ -45,7 +45,8 @@ namespace Armagetron.Game.UI
 
             int by = firstY + 3 * gap + 8;
             var connect = new UiRect(fieldX, by, fieldW, fieldH + 10);
-            int errorY = by + fieldH + 10 + 16;
+            int errorY = by + fieldH + 10 + 14;
+            var browse = new UiRect(fieldX, errorY + PixelFont.Height(ts) + 12, fieldW, fieldH);
 
             int sset = PixelFont.Height(ts) * 2 + 8;
             var settings = new UiRect(w - sset - 16, 16, sset, sset);
@@ -53,7 +54,7 @@ namespace Armagetron.Game.UI
             return new ConnectL
             {
                 Panel = new UiRect(px, py, pw, ph),
-                Host = host, Port = port, Name = name, Connect = connect, Settings = settings,
+                Host = host, Port = port, Name = name, Connect = connect, Browse = browse, Settings = settings,
                 TitleY = titleY, SubY = subY, ErrorY = errorY, TextScale = ts, TitleScale = tts,
             };
         }
@@ -150,6 +151,47 @@ namespace Armagetron.Game.UI
                 Name = name, Swatches = swatches, TurnZone = turn, Sens = sens,
                 Toggles = toggles, Back = back,
                 TitleY = py + 22, TextScale = ts, TitleScale = tts,
+            };
+        }
+
+        // ── Server browser ───────────────────────────────────────────────────────
+
+        public struct ServerL
+        {
+            public UiRect Panel, Direct, Back;
+            public UiRect[] Rows, JoinButtons;
+            public int TitleY, TextScale, TitleScale;
+        }
+
+        public static ServerL Server(int w, int h, int rowCount)
+        {
+            int ts = TextScale(h), tts = TitleScale(h);
+            int pw = Math.Min((int)(w * 0.8), 900);
+            int ph = Math.Min((int)(h * 0.86), 720);
+            int px = (w - pw) / 2, py = (h - ph) / 2;
+
+            int rowH = PixelFont.Height(ts) + 2 * SceneBuf.Pad + 10;
+            int lx = px + 24, cw = pw - 48;
+            int firstY = py + PixelFont.Height(tts) + PixelFont.Height(ts) + 40;
+
+            var rows = new UiRect[rowCount];
+            var joins = new UiRect[rowCount];
+            int joinW = PixelFont.MeasureWidth("DIRECT", ts) + 2 * SceneBuf.Pad;
+            for (int i = 0; i < rowCount; i++)
+            {
+                rows[i] = new UiRect(lx, firstY + i * (rowH + 8), cw, rowH);
+                joins[i] = new UiRect(rows[i].Right - joinW - 6, rows[i].Y + 4, joinW, rowH - 8);
+            }
+
+            int btnH = rowH;
+            var direct = new UiRect(lx, py + ph - 2 * btnH - 20, cw, btnH);
+            var back = new UiRect(lx, py + ph - btnH - 12, cw, btnH);
+
+            return new ServerL
+            {
+                Panel = new UiRect(px, py, pw, ph),
+                Rows = rows, JoinButtons = joins, Direct = direct, Back = back,
+                TitleY = py + 20, TextScale = ts, TitleScale = tts,
             };
         }
 

@@ -27,6 +27,7 @@ namespace Armagetron.Game.UI
 
             buf.DrawButton(new UiButton("connect", L.Connect, "CONNECT") { Enabled = formValid },
                            t, L.TextScale);
+            buf.DrawButton(new UiButton("browse", L.Browse, "SERVER BROWSER"), t, L.TextScale);
             // Placeholder gear: a '*' until the designer's settings icon arrives (DESIGN_BRIEF §8).
             buf.DrawButton(new UiButton("settings", L.Settings, "*"), t, L.TextScale);
 

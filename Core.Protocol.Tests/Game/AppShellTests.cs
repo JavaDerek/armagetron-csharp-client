@@ -259,6 +259,37 @@ namespace Armagetron.Protocol.Tests.Game
         }
 
         [Fact]
+        public void ServerBrowser_OpensFromConnect_Lists_AndJoinsLocal()
+        {
+            var c = new FakeUiClient();
+            var s = Shell(c);
+            var (bx, by) = Center(Layouts.Connect(W, H).Browse);
+            s.HandleTap(bx, by, W, H);
+            Assert.Equal(AppScreen.ServerBrowser, s.Screen);
+
+            Scene scene = s.BuildOverlay(W, H, 0);
+            Assert.Contains(scene.Texts, t => t.Text == "SERVERS");
+            Assert.Contains(scene.Texts, t => t.Text.StartsWith("LOCAL")); // name may be column-clipped
+
+            // Row 0 (the configured local server) is joinable → JOIN connects to it.
+            var L = Layouts.Server(W, H, ServerList.Placeholder("192.168.68.61", 4534).Length);
+            s.HandleTap(L.JoinButtons[0].CenterX, L.JoinButtons[0].CenterY, W, H);
+            Assert.Equal(1, c.BeginConnects);
+            Assert.Equal("192.168.68.61", c.ConnHost);
+            Assert.Equal(AppScreen.Connecting, s.Screen);
+        }
+
+        [Fact]
+        public void ServerBrowser_Back_ReturnsToConnect()
+        {
+            var s = Shell(new FakeUiClient());
+            var (bx, by) = Center(Layouts.Connect(W, H).Browse);
+            s.HandleTap(bx, by, W, H);
+            s.OnBack();
+            Assert.Equal(AppScreen.Connect, s.Screen);
+        }
+
+        [Fact]
         public void Connecting_Cancel_Disconnects()
         {
             var c = new FakeUiClient();

@@ -3,7 +3,7 @@ using Armagetron.Protocol;
 namespace Armagetron.Game.UI
 {
     /// <summary>Top-level screens the client can be showing.</summary>
-    public enum AppScreen { Connect, Connecting, Playing, Paused, Settings, ConfirmLeave }
+    public enum AppScreen { Connect, Connecting, Playing, Paused, Settings, ConfirmLeave, ServerBrowser }
 
     /// <summary>
     /// The pure brain of the front-end: a screen state machine + the single input router for
@@ -107,7 +107,8 @@ namespace Armagetron.Game.UI
                 case AppScreen.Playing:    Screen = AppScreen.Paused; break;
                 case AppScreen.Paused:     Screen = AppScreen.Playing; break;
                 case AppScreen.Settings:   Screen = _settingsReturn; break;
-                case AppScreen.ConfirmLeave: Screen = AppScreen.Paused; break;
+                case AppScreen.ConfirmLeave:  Screen = AppScreen.Paused; break;
+                case AppScreen.ServerBrowser: Screen = AppScreen.Connect; break;
                 case AppScreen.Connecting: _client.Disconnect(); Screen = AppScreen.Connect; break;
                 case AppScreen.Connect:    ExitRequested = true; break;
             }
@@ -153,6 +154,7 @@ namespace Armagetron.Game.UI
                 case AppScreen.Paused:     TapPaused(x, y, w, h); break;
                 case AppScreen.Settings:   TapSettings(x, y, w, h); break;
                 case AppScreen.ConfirmLeave: TapConfirmLeave(x, y, w, h); break;
+                case AppScreen.ServerBrowser: TapServerBrowser(x, y, w, h); break;
             }
         }
 
@@ -162,6 +164,7 @@ namespace Armagetron.Game.UI
             _host.Bounds = L.Host; _port.Bounds = L.Port; _name.Bounds = L.Name;
 
             if (L.Settings.Contains(x, y)) { _settingsReturn = AppScreen.Connect; Screen = AppScreen.Settings; return; }
+            if (L.Browse.Contains(x, y)) { Screen = AppScreen.ServerBrowser; return; }
 
             _host.Focused = L.Host.Contains(x, y);
             _port.Focused = L.Port.Contains(x, y);
@@ -169,6 +172,29 @@ namespace Armagetron.Game.UI
 
             if (L.Connect.Contains(x, y) && IsFormValid()) StartConnect();
         }
+
+        private void TapServerBrowser(int x, int y, int w, int h)
+        {
+            ServerEntry[] servers = ServerList.Placeholder(_host.Value, ParsePortOr(4534));
+            Layouts.ServerL L = Layouts.Server(w, h, servers.Length);
+
+            if (L.Back.Contains(x, y)) { Screen = AppScreen.Connect; return; }
+            if (L.Direct.Contains(x, y)) { Screen = AppScreen.Connect; return; } // edit host/port on connect
+
+            for (int i = 0; i < servers.Length; i++)
+            {
+                if (!servers[i].Joinable || servers[i].Full) continue;
+                if (L.JoinButtons[i].Contains(x, y))
+                {
+                    _host.Value = servers[i].Host;
+                    _port.Value = servers[i].Port.ToString();
+                    if (IsFormValid()) StartConnect();
+                    return;
+                }
+            }
+        }
+
+        private int ParsePortOr(int fallback) => int.TryParse(_port.Value, out int p) ? p : fallback;
 
         private void TapConnecting(int x, int y, int w, int h)
         {
@@ -272,6 +298,12 @@ namespace Armagetron.Game.UI
                                  new[] { "CANCEL", "LEAVE" }, w, h,
                                  subtitle: "ROUND PROGRESS IS LOST.");
                     break;
+                case AppScreen.ServerBrowser:
+                {
+                    ServerEntry[] servers = ServerList.Placeholder(_host.Value, ParsePortOr(4534));
+                    ServerBrowserView.Add(buf, _theme, Layouts.Server(w, h, servers.Length), servers, w, h);
+                    break;
+                }
             }
             return buf.ToScene();
         }

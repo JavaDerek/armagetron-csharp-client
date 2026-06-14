@@ -33,7 +33,7 @@ namespace Armagetron.Game.RenderHarness
         private static Scene BuildScene(string scenario) => scenario switch
         {
             "font" => FontProof(),
-            "connect" or "connecting" or "playing" or "paused" or "settings" => ScreenShot(scenario),
+            "connect" or "connecting" or "playing" or "paused" or "settings" or "servers" => ScreenShot(scenario),
             _      => Gameplay(scenario),
         };
 
@@ -71,6 +71,10 @@ namespace Armagetron.Game.RenderHarness
                     StartPlaying(); shell.OnBack();
                     var sb = Layouts.Menu(Size, Size, 3).Buttons[1];
                     shell.HandleTap(sb.CenterX, sb.CenterY, Size, Size);
+                    break;
+                case "servers":
+                    var br = Layouts.Connect(Size, Size).Browse;
+                    shell.HandleTap(br.CenterX, br.CenterY, Size, Size);
                     break;
             }
 
