@@ -350,8 +350,9 @@ namespace Armagetron.Protocol.Tests.Game
             var s = Playing(c);
             s.OnRoundStart(0);
             Scene scene = s.BuildOverlay(W, H, 65_000);
+            // Player name appears (standings + local-player chip), the top-center clock reads 1:05.
             Assert.Contains(scene.Texts, t => t.Text == "AaBot");
-            Assert.Contains(scene.Texts, t => t.Text == "TIME 1:05");
+            Assert.Contains(scene.Texts, t => t.Text == "1:05");
             // Connected → a success-colored indicator rect present.
             Assert.Contains(scene.Heads, r => r.Color.Equals(UiTheme.Default.Success));
         }

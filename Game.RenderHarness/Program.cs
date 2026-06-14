@@ -20,36 +20,46 @@ namespace Armagetron.Game.RenderHarness
     /// </summary>
     internal static class Program
     {
-        private const int Size = 800;
+        // Landscape, matching the design's 2400×1080 reference and the desktop window's aspect.
+        private const int W = 1280;
+        private const int H = 720;
 
         private static int Main(string[] args)
         {
             string scenario = args.Length > 0 ? args[0] : "freeze";
             string outPath  = args.Length > 1 ? args[1] : $"/tmp/aa_render_{scenario}.png";
-            using var game = new HarnessGame(BuildScene(scenario), Size, outPath);
+            using var game = new HarnessGame(BuildLayers(scenario), W, H, outPath);
             game.Run();
             return File.Exists(outPath) ? 0 : 1;
         }
 
-        private static Scene BuildScene(string scenario) => scenario switch
+        private static List<Layer> BuildLayers(string scenario) => scenario switch
         {
-            "font" => FontProof(),
-            "connect" or "connecting" or "playing" or "paused" or "settings" or "servers" => ScreenShot(scenario),
-            _      => Gameplay(scenario),
+            "font" => new List<Layer> { new Layer(FontProof(), 0, 0) },
+            "connect" or "connecting" or "playing" or "paused" or "settings" or "servers"
+                   => ScreenShot(scenario),
+            _      => new List<Layer> { GameplayLayer(scenario) },
         };
+
+        /// <summary>One translated scene layer (gameplay is letterboxed; the overlay is at 0,0).</summary>
+        internal readonly struct Layer
+        {
+            public readonly Scene Scene; public readonly int Dx, Dy;
+            public Layer(Scene scene, int dx, int dy) { Scene = scene; Dx = dx; Dy = dy; }
+        }
 
         /// <summary>Render a UI screen via the real <see cref="AppShell"/> (gameplay behind it
         /// when applicable), so the PNG is exactly what the front-end would draw.</summary>
-        private static Scene ScreenShot(string name)
+        private static List<Layer> ScreenShot(string name)
         {
             var client = new HarnessClient();
             var shell = new AppShell(client, UiTheme.Default, "192.168.68.61", 4534, "AaBot", touchControls: true);
             long now = 800;
 
-            var conn = Layouts.Connect(Size, Size).Connect;
+            var conn = Layouts.Connect(W, H).Connect;
             void StartPlaying()
             {
-                shell.HandleTap(conn.CenterX, conn.CenterY, Size, Size); // → Connecting
+                shell.HandleTap(conn.CenterX, conn.CenterY, W, H);      // → Connecting
                 client.Status = ConnectionStatus.Connected;
                 shell.Tick(Array.Empty<CycleSnapshot>(), now);          // → Playing
             }
@@ -57,7 +67,7 @@ namespace Armagetron.Game.RenderHarness
             switch (name)
             {
                 case "connecting":
-                    shell.HandleTap(conn.CenterX, conn.CenterY, Size, Size);
+                    shell.HandleTap(conn.CenterX, conn.CenterY, W, H);
                     break;
                 case "playing":
                     StartPlaying();
@@ -70,27 +80,34 @@ namespace Armagetron.Game.RenderHarness
                     break;
                 case "settings":
                     StartPlaying(); shell.OnBack();
-                    var sb = Layouts.Menu(Size, Size, 3).Buttons[1];
-                    shell.HandleTap(sb.CenterX, sb.CenterY, Size, Size);
+                    var sb = Layouts.Menu(W, H, 3).Buttons[1];
+                    shell.HandleTap(sb.CenterX, sb.CenterY, W, H);
                     break;
                 case "servers":
-                    var br = Layouts.Connect(Size, Size).Browse;
-                    shell.HandleTap(br.CenterX, br.CenterY, Size, Size);
+                    var br = Layouts.Connect(W, H).Browse;
+                    shell.HandleTap(br.CenterX, br.CenterY, W, H);
                     break;
             }
 
-            var buf = new SceneBuf();
-            if (shell.ShowsGameplay) buf.Append(Gameplay("freeze"));
-            buf.Append(shell.BuildOverlay(Size, Size, now));
-            return buf.ToScene();
+            var layers = new List<Layer>();
+            if (shell.ShowsGameplay) layers.Add(GameplayLayer("freeze"));
+            layers.Add(new Layer(shell.BuildOverlay(W, H, now), 0, 0));
+            return layers;
+        }
+
+        // The arena is a centred square of the shorter edge, letterboxed into the landscape frame.
+        private static Layer GameplayLayer(string scenario)
+        {
+            int side = Math.Min(W, H);
+            return new Layer(Gameplay(scenario, side), (W - side) / 2, (H - side) / 2);
         }
 
         /// <summary>
         /// A remote cycle drives right, turns up, reaches the TOP WALL; the render is taken
         /// long after the final sync. "freeze" → final sync alive=false (head stops on the
-        /// wall); "ghost" → treated as alive (head pokes through). Same scenarios as before.
+        /// wall); "ghost" → treated as alive (head pokes through).
         /// </summary>
-        private static Scene Gameplay(string scenario)
+        private static Scene Gameplay(string scenario, int side)
         {
             bool alive = scenario == "ghost";
             const float topWall = 176.78f;
@@ -104,7 +121,7 @@ namespace Armagetron.Game.RenderHarness
             w.MoveLocalCycle(5, new Vec2(40, 12), new Vec2(1, 0));
             w.MoveLocalCycle(5, new Vec2(90, 12), new Vec2(1, 0));
 
-            var view = new ArenaView(arenaSize: topWall, margin: 10f, viewSize: Size);
+            var view = new ArenaView(arenaSize: topWall, margin: 10f, viewSize: side);
             return SceneBuilder.BuildWithArt(w.Snapshot(nowMs: 9_999), w.MyCycleId, view,
                                              new CyclePalette(), divisions: 8);
         }
@@ -150,8 +167,8 @@ namespace Armagetron.Game.RenderHarness
     internal sealed class HarnessGame : Microsoft.Xna.Framework.Game
     {
         private readonly GraphicsDeviceManager _graphics;
-        private readonly Scene _scene;
-        private readonly int _size;
+        private readonly List<Program.Layer> _layers;
+        private readonly int _w, _h;
         private readonly string _outPath;
 
         private TextureStore _textures = null!;
@@ -159,15 +176,16 @@ namespace Armagetron.Game.RenderHarness
         private SceneRenderer _renderer = null!;
         private bool _captured;
 
-        public HarnessGame(Scene scene, int size, string outPath)
+        public HarnessGame(List<Program.Layer> layers, int w, int h, string outPath)
         {
-            _scene = scene;
-            _size = size;
+            _layers = layers;
+            _w = w;
+            _h = h;
             _outPath = outPath;
             _graphics = new GraphicsDeviceManager(this)
             {
-                PreferredBackBufferWidth = size,
-                PreferredBackBufferHeight = size,
+                PreferredBackBufferWidth = w,
+                PreferredBackBufferHeight = h,
             };
         }
 
@@ -182,16 +200,17 @@ namespace Armagetron.Game.RenderHarness
         {
             if (_captured) { Exit(); return; }
 
-            var rt = new RenderTarget2D(GraphicsDevice, _size, _size);
+            var rt = new RenderTarget2D(GraphicsDevice, _w, _h);
             GraphicsDevice.SetRenderTarget(rt);
             GraphicsDevice.Clear(Color.Black);
 
-            _renderer.Render(_scene, 0, 0);
+            foreach (Program.Layer layer in _layers)
+                _renderer.Render(layer.Scene, layer.Dx, layer.Dy);
 
             GraphicsDevice.SetRenderTarget(null);
 
             using (var fs = File.Create(_outPath))
-                rt.SaveAsPng(fs, _size, _size);
+                rt.SaveAsPng(fs, _w, _h);
             Console.Error.WriteLine($"wrote {_outPath}");
             _captured = true;
         }

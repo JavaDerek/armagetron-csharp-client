@@ -17,14 +17,34 @@ namespace Armagetron.Game.UI
                                string? error, bool formValid, int w, int h)
         {
             buf.Fill(new UiRect(0, 0, w, h), t.Background);
+
+            // Left brand lockup (left 6%, V-centered): wordmark + ADVANCED sub + tagline.
+            int by = L.Brand.CenterY;
+            buf.TextLeft("ARMAGETRON", L.Brand.X, by - PixelFont.Height(L.TitleScale) - 6,
+                         t.Accent, L.TitleScale, FontRole.Title);
+            buf.TextLeft("ADVANCED", L.Brand.X + 2, by + 14, t.TextMuted, L.TextScale, FontRole.Heading);
+            buf.TextLeft("NEON LIGHTCYCLE COMBAT", L.Brand.X + 2,
+                         by + 14 + PixelFont.Height(L.TextScale) + 16, t.PanelBorder, L.TextScale, FontRole.Label);
+
+            // Right form panel.
             buf.Panel(L.Panel);
-
-            buf.TextCenter("ARMAGETRON", L.Panel.CenterX, L.TitleY, t.Accent, L.TitleScale, FontRole.Title);
-            buf.TextCenter("CONNECT TO SERVER", L.Panel.CenterX, L.SubY, t.TextMuted, L.TextScale, FontRole.Label);
-
             buf.DrawField(host, t, L.TextScale);
             buf.DrawField(port, t, L.TextScale);
             buf.DrawField(name, t, L.TextScale);
+
+            // Status strip: error (danger) or a ready/idle hint (success/muted).
+            if (!string.IsNullOrEmpty(error))
+            {
+                buf.Fill(L.Status, new RenderColor(0xFF, 0x4D, 0x5E, 0x22));
+                buf.Border(L.Status, t.Danger, 1);
+                buf.TextLeftMid(error, L.Status.X + 12, L.Status.CenterY, t.Danger, L.TextScale, FontRole.Label);
+            }
+            else
+            {
+                RenderColor c = formValid ? t.Success : t.TextMuted;
+                buf.TextLeftMid(formValid ? "READY TO CONNECT" : "ENTER SERVER DETAILS",
+                                L.Status.X + 2, L.Status.CenterY, c, L.TextScale, FontRole.Label);
+            }
 
             buf.DrawButton(new UiButton("connect", L.Connect, "CONNECT") { Enabled = formValid },
                            t, L.TextScale);
@@ -32,9 +52,6 @@ namespace Armagetron.Game.UI
                            ButtonStyle.Secondary);
             // Real settings gear icon (DESIGN_BRIEF §8) in place of the old '*' placeholder.
             buf.Icon("gear", L.Settings, pad: 6);
-
-            if (!string.IsNullOrEmpty(error))
-                buf.TextCenter(error, L.Panel.CenterX, L.ErrorY, t.Danger, L.TextScale, FontRole.Label);
         }
     }
 
@@ -63,47 +80,67 @@ namespace Armagetron.Game.UI
                                System.Collections.Generic.IReadOnlyList<Toast> toasts,
                                long now, int w, int h)
         {
-            int ts = L.TextScale, m = L.Margin, line = PixelFont.Height(ts) + 6;
+            int ts = L.TextScale;
 
-            buf.TextLeft(playerName, m, m, nameColor, ts, FontRole.Label);
-            buf.TextLeft("TIME " + match.TimeLabel(now), m, m + line, t.Text, ts, FontRole.Mono);
-            buf.TextLeft("ROUND " + match.RoundNumber + "   CYCLES " + match.CycleCount,
-                         m, m + 2 * line, t.TextMuted, ts, FontRole.Mono);
+            // Round timer (top-center): big mono clock + "ROUND n / 5" caption.
+            buf.TextCenter(match.TimeLabel(now), L.Timer.CenterX, L.Timer.Y, t.Text, ts * 4, FontRole.Mono);
+            buf.TextCenter("ROUND " + match.RoundNumber + " / 5",
+                           L.Timer.CenterX, L.Timer.Bottom - PixelFont.Height(ts), t.TextMuted, ts, FontRole.Label);
 
-            // Connection indicator: a colored dot left of the pause button.
+            // Standings panel (top-left).
+            buf.Panel(L.Standings);
+            buf.TextLeft("STANDINGS", L.Standings.X + 18, L.Standings.Y + 16, t.TextMuted, ts, FontRole.Label);
+            int rowMid = L.Standings.Y + 20 + PixelFont.Height(ts) + 14;
+            buf.Fill(new UiRect(L.Standings.X + 18, rowMid - 6, 12, 12), nameColor);
+            buf.TextLeftMid(playerName, L.Standings.X + 18 + 18, rowMid, t.Text, ts, FontRole.Label);
+            buf.TextRight("x" + match.CycleCount, L.Standings.Right - 22, rowMid - PixelFont.Height(ts) / 2,
+                          t.TextMuted, ts, FontRole.Mono);
+
+            // Connection / ping chip (top-right, left of pause).
+            buf.Panel(L.Ping);
             RenderColor dot = status == ConnectionStatus.Connected ? t.Success
                             : status == ConnectionStatus.Connecting ? t.Accent
                                                                     : t.Danger;
             int d = PixelFont.Height(ts);
-            buf.Fill(new UiRect(L.Pause.X - d - 12, L.Pause.CenterY - d / 2, d, d), dot);
+            buf.Fill(new UiRect(L.Ping.X + 12, L.Ping.CenterY - d / 2, d, d), dot);
+            string conn = status == ConnectionStatus.Connected ? "LIVE"
+                        : status == ConnectionStatus.Connecting ? "SYNC" : "DROP";
+            buf.TextLeftMid(conn, L.Ping.X + 12 + d + 10, L.Ping.CenterY, dot, ts, FontRole.Mono);
 
-            // Real pause icon in place of the old "II" placeholder.
+            // Pause icon (top-right corner).
             buf.Icon("pause", L.Pause, pad: 4);
 
-            // Round banner: a big centred announcement at round start / round over. NB a true
-            // pre-round 3·2·1 countdown needs the desc=24 negative game_time decode (PROTOCOL.md
-            // open item); until then this is an honest round-start/over banner placeholder.
-            int bannerY = h / 4;
+            // Round banner: a big centred announcement at round start / round over. (A true
+            // pre-round 3·2·1 countdown needs the desc=24 negative game_time decode.)
+            int bannerY = (int)(h * 0.30);
             if (match.RoundActive && match.ElapsedMs(now) < 2_500)
                 buf.TextCenter("ROUND " + match.RoundNumber, w / 2, bannerY, t.Accent, ts * 3, FontRole.Title);
             else if (!match.RoundActive && match.RoundNumber > 0)
                 buf.TextCenter("ROUND OVER", w / 2, bannerY, t.Text, ts * 3, FontRole.Title);
 
-            // Death / spectator overlay (design 5.7): ELIMINATED + a spectating line. The arena
-            // keeps playing underneath (placeholder for the design's dimmed spectator camera).
-            if (!match.LocalAlive)
+            // Local-player chip (bottom-center): cyan-bordered pill with the player's name.
+            if (match.LocalAlive)
             {
+                buf.Panel(L.LocalChip);
+                buf.Fill(new UiRect(L.LocalChip.X + 16, L.LocalChip.CenterY - d / 2, d, d), nameColor);
+                buf.TextLeftMid(playerName, L.LocalChip.X + 16 + d + 12, L.LocalChip.CenterY, t.Text, ts, FontRole.Label);
+                buf.TextRight("YOU", L.LocalChip.Right - 16, L.LocalChip.CenterY - PixelFont.Height(ts) / 2,
+                              t.Accent, ts, FontRole.Mono);
+            }
+            else
+            {
+                // Death / spectator overlay (design 5.7): ELIMINATED + a spectating line.
                 buf.TextCenter("ELIMINATED", w / 2, h / 2 - PixelFont.Height(ts * 3), t.Danger, ts * 3, FontRole.Title);
                 buf.TextCenter("SPECTATING - " + match.CycleCount + " CYCLES",
                                w / 2, h / 2 + PixelFont.Height(ts), t.TextMuted, ts, FontRole.Label);
             }
 
-            // Toast stack: newest at the bottom, older ones rising above it.
-            int toastY = (int)(h * 0.72);
-            for (int i = toasts.Count - 1; i >= 0; i--)
+            // Toast stack (top-left region per design 11), under the standings panel.
+            int toastY = L.Standings.Bottom + 16;
+            for (int i = 0; i < toasts.Count; i++)
             {
-                buf.TextCenter(toasts[i].Text, w / 2, toastY, toasts[i].Color, ts, FontRole.Label);
-                toastY -= PixelFont.Height(ts) + 8;
+                buf.TextLeft(toasts[i].Text, L.Standings.X + 4, toastY, toasts[i].Color, ts, FontRole.Label);
+                toastY += PixelFont.Height(ts) + 8;
             }
         }
     }

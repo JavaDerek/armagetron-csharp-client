@@ -19,43 +19,58 @@ namespace Armagetron.Game.UI
 
         public struct ConnectL
         {
-            public UiRect Panel, Host, Port, Name, Connect, Browse, Settings;
-            public int TitleY, SubY, ErrorY, TextScale, TitleScale;
+            public UiRect Panel, Brand, Host, Port, Name, Status, Connect, Browse, Settings;
+            public int TextScale, TitleScale;
         }
 
+        // Redline 5.1: a left brand lockup (left 6%, V-center, max-width 38%) and a right form
+        // panel (right 6%, V-center, width 42%) holding host / port+name row / status / CONNECT.
         public static ConnectL Connect(int w, int h)
         {
             int ts = TextScale(h), tts = TitleScale(h);
-            int pw = Math.Min((int)(w * 0.72), 760);
-            int ph = Math.Min((int)(h * 0.86), 700);
-            int px = (w - pw) / 2, py = (h - ph) / 2;
+            int margin = (int)(w * 0.06);
+            int pw = (int)(w * 0.42);
+            int px = w - margin - pw;
 
-            int fieldX = px + 44, fieldW = pw - 88;
-            int fieldH = PixelFont.Height(ts) + 2 * SceneBuf.Pad + 8;
-            int labelH = PixelFont.Height(ts) + 6;
+            int inset = 30, fieldH = 46;
+            int labelH = PixelFont.Height(ts) + 10;
+            // Wrap the panel tightly around its content (top inset → host label+field →
+            // port/name row label+field → status → CONNECT → SERVER BROWSER → bottom inset).
+            int ph = inset + (labelH + fieldH) + (16 + labelH + fieldH) + 18
+                     + 36 + 16 + 52 + 12 + fieldH + inset;
+            int py = (h - ph) / 2;
 
-            int titleY = py + 28;
-            int subY   = titleY + PixelFont.Height(tts) + 14;
-            int firstY = subY + PixelFont.Height(ts) + 44 + labelH;
-            int gap    = fieldH + labelH + 18;
+            int fx = px + inset, fw = pw - 2 * inset;
 
-            var host = new UiRect(fieldX, firstY, fieldW, fieldH);
-            var port = new UiRect(fieldX, firstY + gap, fieldW, fieldH);
-            var name = new UiRect(fieldX, firstY + 2 * gap, fieldW, fieldH);
+            int y = py + inset + labelH;
+            var host = new UiRect(fx, y, fw, fieldH);
+            y += fieldH + 16 + labelH;
 
-            int by = firstY + 3 * gap + 8;
-            var connect = new UiRect(fieldX, by, fieldW, fieldH + 10);
-            int errorY = by + fieldH + 10 + 14;
-            var browse = new UiRect(fieldX, errorY + PixelFont.Height(ts) + 12, fieldW, fieldH);
+            int gap = 12;
+            int portW = (fw - gap) / 3;            // port flex 1
+            int nameW = fw - gap - portW;          // name flex 2
+            var port = new UiRect(fx, y, portW, fieldH);
+            var name = new UiRect(fx + portW + gap, y, nameW, fieldH);
+            y += fieldH + 18;
 
-            int sset = PixelFont.Height(ts) * 2 + 8;
-            var settings = new UiRect(w - sset - 16, 16, sset, sset);
+            var status = new UiRect(fx, y, fw, 36);
+            y += 36 + 16;
+
+            var connect = new UiRect(fx, y, fw, 52);
+            y += 52 + 12;
+            var browse = new UiRect(fx, y, fw, fieldH);
+
+            int sset = PixelFont.Height(ts) * 2 + 12;
+            var settings = new UiRect(w - sset - 22, 22, sset, sset);
+
+            var brand = new UiRect(margin, py, (int)(w * 0.38), ph);
 
             return new ConnectL
             {
                 Panel = new UiRect(px, py, pw, ph),
-                Host = host, Port = port, Name = name, Connect = connect, Browse = browse, Settings = settings,
-                TitleY = titleY, SubY = subY, ErrorY = errorY, TextScale = ts, TitleScale = tts,
+                Brand = brand, Host = host, Port = port, Name = name, Status = status,
+                Connect = connect, Browse = browse, Settings = settings,
+                TextScale = ts, TitleScale = tts,
             };
         }
 
@@ -78,17 +93,43 @@ namespace Armagetron.Game.UI
 
         // ── Playing (HUD + touch) ────────────────────────────────────────────────
 
-        public struct PlayL { public UiRect Pause; public int TextScale, Margin; }
+        public struct PlayL
+        {
+            public UiRect Pause, Standings, Ping, Timer, LocalChip;
+            public int TextScale;
+        }
 
+        // Redline 5.2: timer top-center, standings top-left (left 6.5%), ping/connection chip and
+        // pause top-right (right 6.5%), local-player chip bottom-center (bottom 5%).
         public static PlayL Play(int w, int h)
         {
             int ts = TextScale(h);
-            int sset = PixelFont.Height(ts) * 2 + 8;
+            int topY = (int)(h * 0.05);
+            int leftX = (int)(w * 0.065);
+            int rightX = w - (int)(w * 0.065);
+            int sset = Clamp(h / 15, 32, 52);
+
+            var pause = new UiRect(rightX - sset, topY, sset, sset);
+
+            int standW = Math.Max(260, (int)(w * 0.22));
+            int standH = PixelFont.Height(ts) * 2 + 52;
+            var standings = new UiRect(leftX, topY, standW, standH);
+
+            int pingW = Math.Max(180, (int)(w * 0.13));
+            var ping = new UiRect(pause.X - pingW - 14, topY, pingW, sset);
+
+            int timerW = Math.Max(180, (int)(w * 0.16));
+            int timerH = PixelFont.Height(ts * 4) + PixelFont.Height(ts) + 14;
+            var timer = new UiRect(w / 2 - timerW / 2, (int)(h * 0.04), timerW, timerH);
+
+            int chipW = Math.Max(300, (int)(w * 0.24));
+            int chipH = sset + 8;
+            var localChip = new UiRect(w / 2 - chipW / 2, h - (int)(h * 0.05) - chipH, chipW, chipH);
+
             return new PlayL
             {
-                Pause = new UiRect(w - sset - 14, 14, sset, sset),
-                TextScale = ts,
-                Margin = 14,
+                Pause = pause, Standings = standings, Ping = ping, Timer = timer,
+                LocalChip = localChip, TextScale = ts,
             };
         }
 
