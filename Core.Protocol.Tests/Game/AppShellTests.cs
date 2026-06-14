@@ -195,9 +195,31 @@ namespace Armagetron.Protocol.Tests.Game
             Assert.Equal(AppScreen.Playing, s.Screen);
 
             s.OnBack();                              // back to Paused
-            s.HandleTap(b[2].CenterX, b[2].CenterY, W, H);   // DISCONNECT
+            s.HandleTap(b[2].CenterX, b[2].CenterY, W, H);   // DISCONNECT → confirm
+            Assert.Equal(AppScreen.ConfirmLeave, s.Screen);
+            Assert.False(c.Disconnected);            // not yet — needs confirmation
+
+            UiRect[] cf = Layouts.Menu(W, H, 2).Buttons;
+            s.HandleTap(cf[1].CenterX, cf[1].CenterY, W, H); // LEAVE
             Assert.True(c.Disconnected);
             Assert.Equal(AppScreen.Connect, s.Screen);
+        }
+
+        [Fact]
+        public void ConfirmLeave_Cancel_ReturnsToPause()
+        {
+            var c = new FakeUiClient();
+            var s = Playing(c);
+            s.OnBack();                                       // Paused
+            UiRect[] b = Layouts.Menu(W, H, 3).Buttons;
+            s.HandleTap(b[2].CenterX, b[2].CenterY, W, H);    // DISCONNECT → confirm
+            Scene scene = s.BuildOverlay(W, H, 0);
+            Assert.Contains(scene.Texts, t => t.Text == "LEAVE MATCH?");
+
+            UiRect[] cf = Layouts.Menu(W, H, 2).Buttons;
+            s.HandleTap(cf[0].CenterX, cf[0].CenterY, W, H);  // CANCEL
+            Assert.False(c.Disconnected);
+            Assert.Equal(AppScreen.Paused, s.Screen);
         }
 
         [Fact]
@@ -297,14 +319,15 @@ namespace Armagetron.Protocol.Tests.Game
         }
 
         [Fact]
-        public void PlayingHud_WhenLocalDead_ShowsWaitingBanner()
+        public void PlayingHud_WhenLocalDead_ShowsSpectatorOverlay()
         {
             var c = new FakeUiClient();
             var s = Playing(c);
             s.OnRoundStart(0);
             s.OnLocalDied();
             Scene scene = s.BuildOverlay(W, H, 0);
-            Assert.Contains(scene.Texts, t => t.Text == "WAITING FOR NEXT ROUND");
+            Assert.Contains(scene.Texts, t => t.Text == "ELIMINATED");
+            Assert.Contains(scene.Texts, t => t.Text.StartsWith("SPECTATING"));
         }
 
         [Fact]

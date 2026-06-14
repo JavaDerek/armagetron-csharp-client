@@ -85,9 +85,15 @@ namespace Armagetron.Game.UI
             else if (!match.RoundActive && match.RoundNumber > 0)
                 buf.TextCenter("ROUND OVER", w / 2, bannerY, t.Text, ts * 3);
 
+            // Death / spectator overlay (design 5.7): ELIMINATED + a spectating line. The arena
+            // keeps playing underneath at full brightness (placeholder for the design's dimmed
+            // spectator camera, which needs per-cycle follow once cycles are individually tracked).
             if (!match.LocalAlive)
-                buf.TextCenter("WAITING FOR NEXT ROUND", w / 2, h / 2 - PixelFont.Height(ts) / 2,
-                               t.TextMuted, ts);
+            {
+                buf.TextCenter("ELIMINATED", w / 2, h / 2 - PixelFont.Height(ts * 3), t.Danger, ts * 3);
+                buf.TextCenter("SPECTATING - " + match.CycleCount + " CYCLES",
+                               w / 2, h / 2 + PixelFont.Height(ts), t.TextMuted, ts);
+            }
 
             // Toast stack: newest at the bottom, older ones rising above it.
             int toastY = (int)(h * 0.72);
@@ -122,14 +128,17 @@ namespace Armagetron.Game.UI
 
     public static class MenuView
     {
-        /// <summary>A dimmed modal with a title and a vertical button stack (pause/settings).</summary>
+        /// <summary>A dimmed modal with a title (optional subtitle) and a vertical button stack.</summary>
         public static void Add(SceneBuf buf, UiTheme t, Layouts.MenuL L, string title,
-                               string[] labels, int w, int h)
+                               string[] labels, int w, int h, string? subtitle = null)
         {
             buf.Fill(new UiRect(0, 0, w, h), new RenderColor(0, 0, 0, 170)); // dim
             buf.Fill(L.Panel, t.Panel);
             buf.Border(L.Panel, t.PanelBorder);
             buf.TextCenter(title, L.Panel.CenterX, L.TitleY, t.Accent, L.TitleScale);
+            if (!string.IsNullOrEmpty(subtitle))
+                buf.TextCenter(subtitle, L.Panel.CenterX, L.TitleY + PixelFont.Height(L.TitleScale) + 8,
+                               t.TextMuted, L.TextScale);
 
             for (int i = 0; i < labels.Length && i < L.Buttons.Length; i++)
                 buf.DrawButton(new UiButton("menu" + i, L.Buttons[i], labels[i]), t, L.TextScale);

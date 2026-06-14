@@ -28,6 +28,17 @@ namespace Armagetron.Protocol.Tests.Game
         }
 
         [Fact]
+        public void Active_CapsToMaxStack_KeepingNewest()
+        {
+            var q = new ToastQueue();
+            for (int i = 0; i < 5; i++) q.Push("T" + i, RenderColor.White, nowMs: 0, ttlMs: 10_000);
+            var a = q.Active(100);
+            Assert.Equal(ToastQueue.MaxStack, a.Count);
+            Assert.Equal("T2", a[0].Text);   // oldest survivor of the newest 3
+            Assert.Equal("T4", a[^1].Text);  // newest at the bottom
+        }
+
+        [Fact]
         public void Active_PreservesPushOrder()
         {
             var q = new ToastQueue();

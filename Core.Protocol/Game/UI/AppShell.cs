@@ -3,7 +3,7 @@ using Armagetron.Protocol;
 namespace Armagetron.Game.UI
 {
     /// <summary>Top-level screens the client can be showing.</summary>
-    public enum AppScreen { Connect, Connecting, Playing, Paused, Settings }
+    public enum AppScreen { Connect, Connecting, Playing, Paused, Settings, ConfirmLeave }
 
     /// <summary>
     /// The pure brain of the front-end: a screen state machine + the single input router for
@@ -37,8 +37,10 @@ namespace Armagetron.Game.UI
         /// <summary>The chosen player name (used by the HUD and as the connect identity).</summary>
         public string PlayerName => _name.Value;
 
-        /// <summary>True when gameplay should be rendered behind the overlay.</summary>
-        public bool ShowsGameplay => Screen == AppScreen.Playing || Screen == AppScreen.Paused;
+        /// <summary>True when gameplay should be rendered behind the overlay (also under the
+        /// pause/leave-confirm modals, which freeze the arena beneath them).</summary>
+        public bool ShowsGameplay => Screen == AppScreen.Playing || Screen == AppScreen.Paused
+                                  || Screen == AppScreen.ConfirmLeave;
 
         public AppShell(IUiClient client, UiTheme theme,
                         string host, int port, string name, bool touchControls = false)
@@ -105,6 +107,7 @@ namespace Armagetron.Game.UI
                 case AppScreen.Playing:    Screen = AppScreen.Paused; break;
                 case AppScreen.Paused:     Screen = AppScreen.Playing; break;
                 case AppScreen.Settings:   Screen = _settingsReturn; break;
+                case AppScreen.ConfirmLeave: Screen = AppScreen.Paused; break;
                 case AppScreen.Connecting: _client.Disconnect(); Screen = AppScreen.Connect; break;
                 case AppScreen.Connect:    ExitRequested = true; break;
             }
@@ -149,6 +152,7 @@ namespace Armagetron.Game.UI
                 case AppScreen.Playing:    TapPlaying(x, y, w, h); break;
                 case AppScreen.Paused:     TapPaused(x, y, w, h); break;
                 case AppScreen.Settings:   TapSettings(x, y, w, h); break;
+                case AppScreen.ConfirmLeave: TapConfirmLeave(x, y, w, h); break;
             }
         }
 
@@ -189,7 +193,14 @@ namespace Armagetron.Game.UI
             UiRect[] b = Layouts.Menu(w, h, 3).Buttons;
             if (b[0].Contains(x, y)) Screen = AppScreen.Playing;                                  // RESUME
             else if (b[1].Contains(x, y)) { _settingsReturn = AppScreen.Paused; Screen = AppScreen.Settings; }
-            else if (b[2].Contains(x, y)) { _client.Disconnect(); Screen = AppScreen.Connect; }   // DISCONNECT
+            else if (b[2].Contains(x, y)) Screen = AppScreen.ConfirmLeave;                        // DISCONNECT → confirm
+        }
+
+        private void TapConfirmLeave(int x, int y, int w, int h)
+        {
+            UiRect[] b = Layouts.Menu(w, h, 2).Buttons;
+            if (b[0].Contains(x, y)) Screen = AppScreen.Paused;                                   // CANCEL
+            else if (b[1].Contains(x, y)) { _client.Disconnect(); Screen = AppScreen.Connect; }   // LEAVE
         }
 
         private void TapSettings(int x, int y, int w, int h)
@@ -229,6 +240,11 @@ namespace Armagetron.Game.UI
                 case AppScreen.Settings:
                     MenuView.Add(buf, _theme, Layouts.Menu(w, h, 2), "SETTINGS",
                                  new[] { "SOUND: " + (SoundEnabled ? "ON" : "OFF"), "BACK" }, w, h);
+                    break;
+                case AppScreen.ConfirmLeave:
+                    MenuView.Add(buf, _theme, Layouts.Menu(w, h, 2), "LEAVE MATCH?",
+                                 new[] { "CANCEL", "LEAVE" }, w, h,
+                                 subtitle: "ROUND PROGRESS IS LOST.");
                     break;
             }
             return buf.ToScene();

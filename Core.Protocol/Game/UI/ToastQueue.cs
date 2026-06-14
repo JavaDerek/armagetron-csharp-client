@@ -22,18 +22,21 @@ namespace Armagetron.Game.UI
     /// </summary>
     public sealed class ToastQueue
     {
-        public const long DefaultTtlMs = 3_000;
+        // Per the approved design: toasts auto-dismiss after 4s and stack at most 3 at once.
+        public const long DefaultTtlMs = 4_000;
+        public const int MaxStack = 3;
 
         private readonly List<Toast> _toasts = new List<Toast>();
 
         public void Push(string text, RenderColor color, long nowMs, long ttlMs = DefaultTtlMs) =>
             _toasts.Add(new Toast(text, color, nowMs + ttlMs));
 
-        /// <summary>Drop expired toasts and return the survivors, oldest first.</summary>
+        /// <summary>Drop expired toasts and return the newest <see cref="MaxStack"/>, oldest first.</summary>
         public IReadOnlyList<Toast> Active(long nowMs)
         {
             _toasts.RemoveAll(t => t.ExpiresAtMs <= nowMs);
-            return _toasts;
+            if (_toasts.Count <= MaxStack) return _toasts;
+            return _toasts.GetRange(_toasts.Count - MaxStack, MaxStack);
         }
 
         public int Count => _toasts.Count;
