@@ -101,7 +101,7 @@ namespace Armagetron.Game.RenderHarness
 
             var view = new ArenaView(arenaSize: topWall, margin: 10f, viewSize: Size);
             return SceneBuilder.BuildWithArt(w.Snapshot(nowMs: 9_999), w.MyCycleId, view,
-                                             new CyclePalette(), new RenderColor(28, 28, 44), divisions: 8);
+                                             new CyclePalette(), new RenderColor(0x16, 0x22, 0x3A), divisions: 8);
         }
 
         /// <summary>Exercises every placeholder glyph so the font can be eyeballed.</summary>

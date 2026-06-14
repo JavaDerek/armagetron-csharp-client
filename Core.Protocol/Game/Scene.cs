@@ -146,22 +146,24 @@ namespace Armagetron.Game
     /// <summary>
     /// Stable per-cycle color assignment. The local cycle is always <see cref="Mine"/>;
     /// remote cycles cycle through a fixed palette in first-seen order, so a given cycle
-    /// keeps its color for the whole session.
+    /// keeps its color for the whole session. The 8 colors are the CVD-checked trail palette
+    /// from the approved design (armagetron-advanced-design.html, vars --p1…--p8); the local
+    /// cycle takes the cyan signature (--p1) and remotes use the other seven, cyan last.
     /// </summary>
     public sealed class CyclePalette
     {
-        public static readonly RenderColor Mine = new RenderColor(124, 252, 0); // LawnGreen
+        public static readonly RenderColor Mine = new RenderColor(0x1F, 0xE3, 0xFF); // --p1 cyan (signature)
 
         private static readonly RenderColor[] Palette =
         {
-            new RenderColor(255, 0, 0),     // Red
-            new RenderColor(0, 255, 255),   // Cyan
-            new RenderColor(255, 255, 0),   // Yellow
-            new RenderColor(255, 0, 255),   // Magenta
-            new RenderColor(255, 165, 0),   // Orange
-            new RenderColor(255, 105, 180), // HotPink
-            new RenderColor(30, 144, 255),  // DodgerBlue
-            new RenderColor(0, 255, 0),     // Lime
+            new RenderColor(0xFF, 0x9A, 0x2E), // --p2 orange
+            new RenderColor(0xFF, 0x2F, 0xA4), // --p3 pink
+            new RenderColor(0x8D, 0xFF, 0x3A), // --p4 green
+            new RenderColor(0x3D, 0x8B, 0xFF), // --p5 blue
+            new RenderColor(0xFF, 0x4D, 0x4D), // --p6 red
+            new RenderColor(0xFF, 0xE0, 0x3A), // --p7 yellow
+            new RenderColor(0xB9, 0x68, 0xFF), // --p8 purple
+            new RenderColor(0x1F, 0xE3, 0xFF), // --p1 cyan
         };
 
         private readonly Dictionary<int, RenderColor> _assigned = new Dictionary<int, RenderColor>();

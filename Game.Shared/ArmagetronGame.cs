@@ -22,8 +22,8 @@ namespace Armagetron.Game
         private const float ArenaMargin = 10f;
         private const int   WindowSize  = 800;
 
-        // PLACEHOLDER floor grid (DESIGN_BRIEF §6) until the designer's arena texture lands.
-        private static readonly RenderColor GridColor = new RenderColor(28, 28, 44);
+        // Faint floor grid in the design's --raise tone (placeholder until the arena texture lands).
+        private static readonly RenderColor GridColor = new RenderColor(0x16, 0x22, 0x3A);
         private const int GridDivisions = 8;
 
         private readonly GraphicsDeviceManager _graphics;
