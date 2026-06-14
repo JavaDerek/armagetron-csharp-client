@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Armagetron.Game;
+using Armagetron.Game.UI;
 using Armagetron.Protocol;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -32,8 +33,50 @@ namespace Armagetron.Game.RenderHarness
         private static Scene BuildScene(string scenario) => scenario switch
         {
             "font" => FontProof(),
+            "connect" or "connecting" or "playing" or "paused" or "settings" => ScreenShot(scenario),
             _      => Gameplay(scenario),
         };
+
+        /// <summary>Render a UI screen via the real <see cref="AppShell"/> (gameplay behind it
+        /// when applicable), so the PNG is exactly what the front-end would draw.</summary>
+        private static Scene ScreenShot(string name)
+        {
+            var client = new HarnessClient();
+            var shell = new AppShell(client, UiTheme.Default, "192.168.68.61", 4534, "AaBot", touchControls: true);
+            long now = 800;
+
+            var conn = Layouts.Connect(Size, Size).Connect;
+            void StartPlaying()
+            {
+                shell.HandleTap(conn.CenterX, conn.CenterY, Size, Size); // → Connecting
+                client.Status = ConnectionStatus.Connected;
+                shell.Tick(Array.Empty<CycleSnapshot>(), now);          // → Playing
+                shell.OnRoundStart(0);
+            }
+
+            switch (name)
+            {
+                case "connecting":
+                    shell.HandleTap(conn.CenterX, conn.CenterY, Size, Size);
+                    break;
+                case "playing":
+                    StartPlaying(); now = 65_000;
+                    break;
+                case "paused":
+                    StartPlaying(); shell.OnBack();
+                    break;
+                case "settings":
+                    StartPlaying(); shell.OnBack();
+                    var sb = Layouts.Menu(Size, Size, 3).Buttons[1];
+                    shell.HandleTap(sb.CenterX, sb.CenterY, Size, Size);
+                    break;
+            }
+
+            var buf = new SceneBuf();
+            if (shell.ShowsGameplay) buf.Append(Gameplay("freeze"));
+            buf.Append(shell.BuildOverlay(Size, Size, now));
+            return buf.ToScene();
+        }
 
         /// <summary>
         /// A remote cycle drives right, turns up, reaches the TOP WALL; the render is taken
@@ -74,6 +117,19 @@ namespace Armagetron.Game.RenderHarness
             };
             return new Scene(Array.Empty<RenderSegment>(), Array.Empty<RenderRect>(), texts);
         }
+    }
+
+    /// <summary>A no-socket <see cref="IUiClient"/> for screenshotting UI screens.</summary>
+    internal sealed class HarnessClient : IUiClient
+    {
+        public ConnectionStatus Status { get; set; } = ConnectionStatus.Idle;
+        public string? LastError => null;
+        public int MyCycleId => -1;
+        public CycleSnapshot[] Snapshot() => Array.Empty<CycleSnapshot>();
+        public void BeginConnect(string host, int port, string name) => Status = ConnectionStatus.Connecting;
+        public void Disconnect() => Status = ConnectionStatus.Idle;
+        public void TurnLeft() { }
+        public void TurnRight() { }
     }
 
     internal sealed class HarnessGame : Microsoft.Xna.Framework.Game

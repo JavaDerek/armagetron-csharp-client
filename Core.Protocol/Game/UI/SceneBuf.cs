@@ -113,6 +113,15 @@ namespace Armagetron.Game.UI
             return this;
         }
 
+        /// <summary>Append an existing scene's draw lists (e.g. gameplay under a HUD overlay).</summary>
+        public SceneBuf Append(Scene scene)
+        {
+            _segments.AddRange(scene.Segments);
+            _rects.AddRange(scene.Heads);
+            _texts.AddRange(scene.Texts);
+            return this;
+        }
+
         /// <summary>Finalize into an immutable <see cref="Scene"/>.</summary>
         public Scene ToScene() => new Scene(_segments, _rects, _texts);
     }
