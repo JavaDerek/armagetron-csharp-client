@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
+  <defs><filter id="g" x="-40%" y="-40%" width="180%" height="180%">
+    <feDropShadow dx="0" dy="0" stdDeviation="3.2" flood-color="#1FE3FF" flood-opacity="0.95"></feDropShadow>
+    <feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#1FE3FF" flood-opacity="0.5"></feDropShadow>
+  </filter></defs>
+  <g filter="url(#g)" fill="none" stroke="#1FE3FF" stroke-width="8.1" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="54" y1="29.2" x2="37.8" y2="77.8"></line>
+    <line x1="54" y1="29.2" x2="70.2" y2="77.8"></line>
+    <line x1="43.7" y1="62.1" x2="64.3" y2="62.1"></line>
+  </g>
+  <circle cx="54" cy="27.5" r="5.4" fill="#EAFBFF" filter="url(#g)"></circle>
+</svg>

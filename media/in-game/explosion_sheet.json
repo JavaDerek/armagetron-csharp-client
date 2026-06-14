@@ -1,0 +1,20 @@
+{
+  "image": "explosion_sheet_512.png",
+  "sheetSize": [
+    512,
+    512
+  ],
+  "cell": [
+    128,
+    128
+  ],
+  "cols": 4,
+  "rows": 4,
+  "frames": 16,
+  "fps": 30,
+  "durationMs": 533,
+  "loop": false,
+  "tintable": true,
+  "blendMode": "additive",
+  "note": "White master — tint to the dying player color, draw additive. Origin = cell center."
+}

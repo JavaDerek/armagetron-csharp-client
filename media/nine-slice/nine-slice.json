@@ -1,0 +1,59 @@
+{
+  "_comment": "Armagetron Advanced — nine-slice + button-state spec. All colors sRGB hex (8-digit = #RRGGBBAA). Source PNGs are pre-rendered; *.9.png are Android nine-patch (1px guide border). Stretch insets are in source-pixels.",
+  "panel": {
+    "source": "panel_9slice.png",
+    "ninePatch": "panel.9.png",
+    "sourceSize": [96, 96],
+    "slice": { "left": 28, "top": 28, "right": 28, "bottom": 28, "_note": "corners fixed, edges stretch on 1 axis, center stretches both" },
+    "contentPadding": [28, 28, 28, 28],
+    "radius": 10,
+    "border": { "width": 2, "color": "#1FE3FF" },
+    "fill": {
+      "type": "linear-gradient",
+      "angle": 180,
+      "stops": [
+        { "at": 0.0, "color": "#121C30EB" },
+        { "at": 1.0, "color": "#0C1322EB" }
+      ],
+      "_designOpacity": "comps use 0.70 alpha over arena; baked here at 0.92 for standalone use — drop to rgba(.,.,.,0.7) if compositing live"
+    },
+    "innerGlow": { "color": "#1FE3FF", "alpha": 0.06, "blur": 22, "spread": "inset" },
+    "outerGlow": { "color": "#1FE3FF", "alpha": 0.15, "blur": 20 },
+    "usedFor": ["modal background", "HUD standings panel", "settings sheet", "toast background"]
+  },
+  "buttons": {
+    "geometry": { "height": 46, "radius": 7, "slice": { "left": 28, "right": 28, "top": 29, "bottom": 31, "_note": "horizontal stretch only; height fixed" }, "sourceSize": [72, 60], "glowPad": 7 },
+    "states": {
+      "default": {
+        "source": "button-default_9slice.png", "ninePatch": "button-default.9.png",
+        "fill": { "type": "linear-gradient", "angle": 180, "stops": [ { "at": 0, "color": "#1FE3FF" }, { "at": 1, "color": "#0FB4D6" } ] },
+        "topHighlight": { "color": "#FFFFFF", "alpha": 0.40, "height": 1.5, "position": "inset-top" },
+        "outerGlow": { "color": "#1FE3FF", "alpha": 0.35, "blur": 16 },
+        "textColor": "#04141A"
+      },
+      "pressed": {
+        "source": "button-pressed_9slice.png", "ninePatch": "button-pressed.9.png",
+        "fill": { "type": "linear-gradient", "angle": 180, "stops": [ { "at": 0, "color": "#0FB4D6" }, { "at": 1, "color": "#0A8FB0" } ] },
+        "innerShadow": { "color": "#000000", "alpha": 0.30, "blur": 6, "position": "inset-top" },
+        "outerGlow": { "color": "#1FE3FF", "alpha": 0.60, "blur": 26 },
+        "transform": { "translateY": 1 },
+        "textColor": "#04141A"
+      },
+      "disabled": {
+        "source": "button-disabled_9slice.png", "ninePatch": "button-disabled.9.png",
+        "fill": { "type": "solid", "color": "#10182A" },
+        "border": { "width": 1, "color": "#21314C" },
+        "opacity": 0.5, "outerGlow": null, "textColor": "#647994"
+      },
+      "secondary": {
+        "source": "button-secondary_9slice.png", "ninePatch": "button-secondary.9.png",
+        "fill": { "type": "none" },
+        "border": { "width": 1.5, "color": "#2C3F60" },
+        "outerGlow": null, "textColor": "#1FE3FF"
+      }
+    }
+  },
+  "motion": {
+    "buttonPress": { "duration_ms": 90, "easing": "ease-out", "scale": 0.97, "note": "glow bloom on press, snap back on release" }
+  }
+}
