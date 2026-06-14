@@ -1,7 +1,20 @@
+using System.Collections.Generic;
 using Armagetron.Protocol;
 
 namespace Armagetron.Game.UI
 {
+    /// <summary>A round-lifecycle event the HUD/match state cares about, surfaced from the
+    /// protocol thread to the UI thread via <see cref="IUiClient.DrainEvents"/>.</summary>
+    public enum MatchEvent
+    {
+        /// <summary>A new round began.</summary>
+        RoundStart,
+        /// <summary>The current round ended.</summary>
+        RoundEnd,
+        /// <summary>The local cycle crashed.</summary>
+        LocalDied,
+    }
+
     /// <summary>Where a connection attempt stands, as the UI sees it.</summary>
     public enum ConnectionStatus
     {
@@ -45,5 +58,12 @@ namespace Armagetron.Game.UI
         /// <summary>Queue a left/right turn for the local cycle (no-op if not playing).</summary>
         void TurnLeft();
         void TurnRight();
+
+        /// <summary>
+        /// Return and clear any round-lifecycle events seen since the last call. The adapter
+        /// buffers them off the protocol thread so the shell can consume them on the UI thread
+        /// inside <see cref="AppShell.Tick"/>.
+        /// </summary>
+        IReadOnlyList<MatchEvent> DrainEvents();
     }
 }

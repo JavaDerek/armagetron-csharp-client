@@ -31,6 +31,14 @@ namespace Armagetron.Protocol.Tests.Game
         public void Disconnect() { Disconnected = true; Status = ConnectionStatus.Idle; }
         public void TurnLeft() => Lefts++;
         public void TurnRight() => Rights++;
+
+        public readonly System.Collections.Generic.Queue<MatchEvent> Events = new();
+        public System.Collections.Generic.IReadOnlyList<MatchEvent> DrainEvents()
+        {
+            var list = new System.Collections.Generic.List<MatchEvent>(Events);
+            Events.Clear();
+            return list;
+        }
     }
 
     public class AppShellTests
@@ -334,6 +342,25 @@ namespace Armagetron.Protocol.Tests.Game
             Scene settings = s.BuildOverlay(W, H, 0);
             Assert.Contains(settings.Texts, t => t.Text == "SETTINGS");
             Assert.Contains(settings.Texts, t => t.Text == "SOUND: ON");
+        }
+
+        [Fact]
+        public void Tick_DrainsClientEvents_IntoMatchState()
+        {
+            var c = new FakeUiClient();
+            var s = Playing(c);
+            c.Events.Enqueue(MatchEvent.RoundStart);
+            s.Tick(Array.Empty<CycleSnapshot>(), 1_000);
+            Assert.Equal(1, s.Match.RoundNumber);
+            Assert.True(s.Match.LocalAlive);
+
+            c.Events.Enqueue(MatchEvent.LocalDied);
+            s.Tick(Array.Empty<CycleSnapshot>(), 2_000);
+            Assert.False(s.Match.LocalAlive);
+
+            c.Events.Enqueue(MatchEvent.RoundEnd);
+            s.Tick(Array.Empty<CycleSnapshot>(), 3_000);
+            Assert.False(s.Match.RoundActive);
         }
 
         [Fact]

@@ -10,8 +10,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Shared, platform-agnostic MonoGame host, also linked by Game.Android. -->
+    <!-- Shared, platform-agnostic MonoGame host + input contract, also linked by Game.Android. -->
     <Compile Include="..\Game.Shared\ArmagetronGame.cs" Link="Shared\ArmagetronGame.cs" />
+    <Compile Include="..\Game.Shared\IShellInput.cs" Link="Shared\IShellInput.cs" />
   </ItemGroup>
 
   <ItemGroup>

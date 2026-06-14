@@ -23,6 +23,7 @@
          API surface (Microsoft.Xna.Framework.*) is identical across the DesktopGL and
          Android packages, so this single source file compiles unchanged on both. -->
     <Compile Include="..\Game.Shared\ArmagetronGame.cs" Link="Shared\ArmagetronGame.cs" />
+    <Compile Include="..\Game.Shared\IShellInput.cs" Link="Shared\IShellInput.cs" />
   </ItemGroup>
 
   <ItemGroup>

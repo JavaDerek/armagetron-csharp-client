@@ -1,5 +1,5 @@
 using System;
-using Armagetron.Lib;
+using Armagetron.Game.UI;
 using Armagetron.Protocol;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -8,46 +8,46 @@ namespace Armagetron.Game
 {
     /// <summary>
     /// MonoGame host for the Armagetron client, shared by every platform head (desktop,
-    /// Android). It is a pure front-end over the ArmaLib <see cref="ArmaClient"/> facade:
-    /// it pulls turn intents from a platform-supplied <see cref="ITurnInput"/>, forwards
-    /// them, grabs a render-ready snapshot each frame, and draws it. All networking, the
-    /// session-loop thread, every protocol primitive, AND the choice of input device live
-    /// outside this class — desktop hands it a keyboard input, Android hands it touch.
+    /// Android). It is a thin loop over the pure <see cref="AppShell"/>: each frame it forwards
+    /// platform input (taps/turn-keys/back/text via <see cref="IShellInput"/>) to the shell,
+    /// ticks it, draws gameplay when the shell is showing a game, and draws the shell's
+    /// screen-space overlay (connect/HUD/pause/settings) on top. The shell decides everything;
+    /// this class only issues GPU calls. All networking and the choice of input device live
+    /// outside — desktop hands it a keyboard/mouse input, Android hands it touch.
     /// </summary>
     public sealed class ArmagetronGame : Microsoft.Xna.Framework.Game
     {
-        // Arena runs 0→ArenaSize in both axes (empirical from spawn positions;
-        // will be replaced by desc=51 decode once that's implemented).
+        // Arena runs 0→ArenaSize in both axes (empirical; replaced by desc=51 decode later).
         private const float ArenaSize   = 176.78f;
-        private const float ArenaMargin = 10f;    // screen-pixel padding outside the walls
-        private const int   WindowSize  = 800;    // desktop window side in pixels
+        private const float ArenaMargin = 10f;
+        private const int   WindowSize  = 800;
 
         private readonly GraphicsDeviceManager _graphics;
-        private SpriteBatch _spriteBatch    = null!;
-        private Texture2D   _pixel          = null!;
+        private SpriteBatch _spriteBatch = null!;
+        private Texture2D   _pixel       = null!;
 
         private readonly string _title;
-
-        private readonly ArmaClient _client;
-        private readonly ITurnInput _input;
-
-        // The pure render model is built in LoadContent once the real back-buffer size is
-        // known: the arena is drawn as a centred square sized to the smaller screen edge,
-        // so it fills a desktop window and letterboxes correctly on any phone aspect ratio.
-        private ArenaView    _view    = null!;
-        private int          _offsetX, _offsetY;
+        private readonly IUiClient _client;
+        private readonly IShellInput _input;
+        private readonly AppShell _shell;
         private readonly CyclePalette _palette = new CyclePalette();
 
+        private ArenaView _view = null!;
+        private int _offsetX, _offsetY, _w, _h, _side = -1;
+        private long _nowMs;
+        private CycleSnapshot[] _snapshot = Array.Empty<CycleSnapshot>();
+
         /// <summary>
-        /// Construct with a client that has ALREADY connected+registered (see
-        /// <see cref="ArmaClient.Connect"/>) and a platform input source. When
-        /// <paramref name="fullscreen"/> is true (Android) the device resolution is used;
-        /// otherwise an 800×800 window is requested (desktop).
+        /// Construct with a UI-facing client (NOT pre-connected — the shell drives the connect
+        /// screen) and the shell + platform input. <paramref name="fullscreen"/> uses the device
+        /// resolution (Android); otherwise an 800×800 window is requested (desktop).
         /// </summary>
-        public ArmagetronGame(ArmaClient client, ITurnInput input, string title, bool fullscreen = false)
+        public ArmagetronGame(IUiClient client, IShellInput input, AppShell shell,
+                              string title, bool fullscreen = false)
         {
             _client = client;
             _input  = input;
+            _shell  = shell;
             _title  = title;
 
             _graphics = new GraphicsDeviceManager(this);
@@ -70,25 +70,37 @@ namespace Armagetron.Game
             _spriteBatch = new SpriteBatch(GraphicsDevice);
             _pixel       = new Texture2D(GraphicsDevice, 1, 1);
             _pixel.SetData(new[] { Color.White });
+            EnsureView();
+        }
 
-            // Square arena sized to the shorter screen edge, centred in the back buffer.
-            int w    = GraphicsDevice.Viewport.Width;
-            int h    = GraphicsDevice.Viewport.Height;
-            int side = Math.Min(w, h);
+        // Recompute the centred square arena view whenever the back-buffer size changes
+        // (window resize / device rotation), so the arena always fills the shorter edge.
+        private void EnsureView()
+        {
+            _w = GraphicsDevice.Viewport.Width;
+            _h = GraphicsDevice.Viewport.Height;
+            int side = Math.Min(_w, _h);
+            if (side == _side) return;
+            _side    = side;
             _view    = new ArenaView(ArenaSize, ArenaMargin, side);
-            _offsetX = (w - side) / 2;
-            _offsetY = (h - side) / 2;
+            _offsetX = (_w - side) / 2;
+            _offsetY = (_h - side) / 2;
         }
 
         protected override void Update(GameTime gameTime)
         {
-            foreach (TurnDirection dir in _input.Poll())
-            {
-                if (dir == TurnDirection.Left) _client.TurnLeft();
-                else                           _client.TurnRight();
-            }
+            EnsureView();
+            _nowMs = (long)gameTime.TotalGameTime.TotalMilliseconds;
 
-            if (_input.ExitRequested) Exit();
+            foreach (TapPoint t in _input.Taps())          _shell.HandleTap(t.X, t.Y, _w, _h);
+            foreach (TurnDirection d in _input.TurnKeys())  _shell.OnTurn(d);
+            if (_input.BackPressed())                       _shell.OnBack();
+            _input.ApplyTextEditing(_shell);
+
+            _snapshot = _client.Snapshot();
+            _shell.Tick(_snapshot, _nowMs);
+
+            if (_shell.ExitRequested) Exit();
 
             base.Update(gameTime);
         }
@@ -98,40 +110,58 @@ namespace Armagetron.Game
             GraphicsDevice.Clear(Color.Black);
             _spriteBatch.Begin();
 
-            // The facade hands back cycles already dead-reckoned to "now"; the pure model
-            // decides everything else. Here we only issue the GPU calls, shifting by the
-            // centring offset so the square arena sits in the middle of the back buffer.
-            CycleSnapshot[] cycles = _client.Snapshot();
-            Scene scene = SceneBuilder.Build(cycles, _client.MyCycleId, _view, _palette);
+            if (_shell.ShowsGameplay)
+            {
+                Scene game = SceneBuilder.Build(_snapshot, _client.MyCycleId, _view, _palette);
+                DrawScene(game, _offsetX, _offsetY);
+            }
 
-            foreach (RenderSegment seg in scene.Segments)
-                DrawLine(ToVec(seg.From), ToVec(seg.To), ToXna(seg.Color), seg.Thickness);
-
-            foreach (RenderRect r in scene.Heads)
-                _spriteBatch.Draw(_pixel, new Rectangle(r.X + _offsetX, r.Y + _offsetY, r.W, r.H), ToXna(r.Color));
+            DrawScene(_shell.BuildOverlay(_w, _h, _nowMs), 0, 0);
 
             _spriteBatch.End();
             base.Draw(gameTime);
         }
 
-        // ── GPU glue (the only rendering code that needs a graphics device) ───
+        // ── GPU glue (the only rendering code that needs a graphics device) ───────
 
-        private void DrawLine(Vector2 from, Vector2 to, Color color, float thickness)
+        private void DrawScene(Scene scene, int dx, int dy)
         {
-            Vector2 diff = to - from;
-            if (diff == Vector2.Zero) return;
-            float angle = MathF.Atan2(diff.Y, diff.X);
-            float len   = diff.Length();
-            _spriteBatch.Draw(
-                _pixel, from, null, color, angle,
-                Vector2.Zero, new Vector2(len, thickness),
-                SpriteEffects.None, 0f);
+            foreach (RenderSegment seg in scene.Segments)
+                DrawLine(seg.From.X + dx, seg.From.Y + dy, seg.To.X + dx, seg.To.Y + dy,
+                         ToXna(seg.Color), seg.Thickness);
+            foreach (RenderRect r in scene.Heads)
+                _spriteBatch.Draw(_pixel, new Rectangle(r.X + dx, r.Y + dy, r.W, r.H), ToXna(r.Color));
+            foreach (RenderText t in scene.Texts)
+                DrawText(t, dx, dy);
         }
 
-        private Vector2 ToVec(Vec2 v) => new Vector2(v.X + _offsetX, v.Y + _offsetY);
-        private static Color ToXna(RenderColor c) => new Color(c.R, c.G, c.B, c.A);
+        private void DrawText(RenderText t, int dx, int dy)
+        {
+            Color color = ToXna(t.Color);
+            for (int i = 0; i < t.Text.Length; i++)
+            {
+                Glyph g = PixelFont.Get(t.Text[i]);
+                int gx = t.X + dx + i * PixelFont.Advance * t.Scale;
+                for (int row = 0; row < PixelFont.GlyphHeight; row++)
+                    for (int col = 0; col < PixelFont.GlyphWidth; col++)
+                        if (g.IsLit(col, row))
+                            _spriteBatch.Draw(_pixel,
+                                new Rectangle(gx + col * t.Scale, t.Y + dy + row * t.Scale, t.Scale, t.Scale),
+                                color);
+            }
+        }
 
-        // ── Lifecycle ─────────────────────────────────────────────────────────
+        private void DrawLine(float x0, float y0, float x1, float y1, Color color, float thickness)
+        {
+            var from = new Vector2(x0, y0);
+            Vector2 diff = new Vector2(x1, y1) - from;
+            if (diff == Vector2.Zero) return;
+            float angle = MathF.Atan2(diff.Y, diff.X);
+            _spriteBatch.Draw(_pixel, from, null, color, angle, Vector2.Zero,
+                new Vector2(diff.Length(), thickness), SpriteEffects.None, 0f);
+        }
+
+        private static Color ToXna(RenderColor c) => new Color(c.R, c.G, c.B, c.A);
 
         protected override void UnloadContent()
         {

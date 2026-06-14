@@ -130,6 +130,7 @@ namespace Armagetron.Game.RenderHarness
         public void Disconnect() => Status = ConnectionStatus.Idle;
         public void TurnLeft() { }
         public void TurnRight() { }
+        public IReadOnlyList<MatchEvent> DrainEvents() => Array.Empty<MatchEvent>();
     }
 
     internal sealed class HarnessGame : Microsoft.Xna.Framework.Game

@@ -57,6 +57,16 @@ namespace Armagetron.Game.UI
         {
             Match.SetCycleCount(snapshot.Length);
 
+            foreach (MatchEvent ev in _client.DrainEvents())
+            {
+                switch (ev)
+                {
+                    case MatchEvent.RoundStart: Match.OnRoundStart(nowMs); break;
+                    case MatchEvent.RoundEnd:   Match.OnRoundEnd(); break;
+                    case MatchEvent.LocalDied:  Match.OnLocalDied(); break;
+                }
+            }
+
             if (Screen == AppScreen.Connecting)
             {
                 if (_client.Status == ConnectionStatus.Connected) { Screen = AppScreen.Playing; _error = null; }
@@ -105,6 +115,9 @@ namespace Armagetron.Game.UI
 
         /// <summary>Id of the focused field, or null (used by Android to open a soft keyboard).</summary>
         public string? FocusedFieldId => Focused()?.Id;
+
+        /// <summary>Current value of the focused field, or null (prefills the soft keyboard).</summary>
+        public string? FocusedFieldValue => Focused()?.Value;
 
         /// <summary>Replace the focused field's value wholesale (Android soft-keyboard result).</summary>
         public void SetFocusedFieldValue(string value)
