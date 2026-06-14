@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Armagetron.Game;
 using Armagetron.Protocol;
@@ -8,77 +9,93 @@ using Microsoft.Xna.Framework.Graphics;
 namespace Armagetron.Game.RenderHarness
 {
     /// <summary>
-    /// Headless render harness (Tier 2): renders a SCRIPTED GameWorld — no socket, no
-    /// live server — to an offscreen RenderTarget and writes a PNG. Lets rendering be
-    /// inspected as an artifact without a window or a human. The scene routes through
-    /// the same pure <see cref="SceneBuilder"/> the desktop client uses, so the PNG is a
-    /// faithful render of production geometry.
+    /// Headless render harness (Tier 2): builds a pure <see cref="Scene"/> — no socket, no
+    /// live server — renders it to an offscreen RenderTarget, and writes a PNG. Lets every
+    /// rendered surface (gameplay AND the UI screens) be inspected as an artifact without a
+    /// window or a human. Each scenario routes through the SAME pure builders the real client
+    /// uses (<see cref="SceneBuilder"/> for gameplay, the screen view builders for UI), so a
+    /// PNG is a faithful render of production geometry and text.
     /// </summary>
     internal static class Program
     {
+        private const int Size = 800;
+
         private static int Main(string[] args)
         {
             string scenario = args.Length > 0 ? args[0] : "freeze";
             string outPath  = args.Length > 1 ? args[1] : $"/tmp/aa_render_{scenario}.png";
-            using var game = new HarnessGame(BuildScene(scenario), outPath);
+            using var game = new HarnessGame(BuildScene(scenario), Size, outPath);
             game.Run();
             return File.Exists(outPath) ? 0 : 1;
         }
 
-        /// <summary>
-        /// A remote cycle drives right, turns up, and reaches the TOP WALL — then the
-        /// final sync arrives. The render is taken long after that sync (a dead cycle
-        /// gets no more syncs). Two scenarios isolate the death-freeze fix:
-        ///   "freeze" — final sync is alive=false: head must stop ON the wall.
-        ///   "ghost"  — final sync treated as alive=true (pre-fix behavior): the head
-        ///              dead-reckons past the wall (capped) and poke through it.
-        /// </summary>
-        private static GameWorld BuildScene(string scenario)
+        private static Scene BuildScene(string scenario) => scenario switch
         {
-            bool alive = scenario == "ghost"; // pre-fix: never freezes, keeps extrapolating
+            "font" => FontProof(),
+            _      => Gameplay(scenario),
+        };
+
+        /// <summary>
+        /// A remote cycle drives right, turns up, reaches the TOP WALL; the render is taken
+        /// long after the final sync. "freeze" → final sync alive=false (head stops on the
+        /// wall); "ghost" → treated as alive (head pokes through). Same scenarios as before.
+        /// </summary>
+        private static Scene Gameplay(string scenario)
+        {
+            bool alive = scenario == "ghost";
             const float topWall = 176.78f;
 
             var w = new GameWorld();
             w.SetMyCycleId(5);
-
-            // Remote cycle 9: right along y=40, turn up at x=120, up to the top wall.
             w.UpdateRemoteCycle(9, new Vec2(10, 40),       new Vec2(1, 0), nowMs: 0,    alive: true,  speed: 30f);
             w.UpdateRemoteCycle(9, new Vec2(120, 40),      new Vec2(1, 0), nowMs: 1000, alive: true,  speed: 30f);
             w.UpdateRemoteCycle(9, new Vec2(120, 90),      new Vec2(0, 1), nowMs: 2000, alive: true,  speed: 30f);
             w.UpdateRemoteCycle(9, new Vec2(120, topWall), new Vec2(0, 1), nowMs: 3000, alive: alive, speed: 30f);
-
-            // Our cycle 5: a short straight run along the bottom.
             w.MoveLocalCycle(5, new Vec2(40, 12), new Vec2(1, 0));
             w.MoveLocalCycle(5, new Vec2(90, 12), new Vec2(1, 0));
 
-            return w;
+            var view = new ArenaView(arenaSize: topWall, margin: 10f, viewSize: Size);
+            return SceneBuilder.Build(w.Snapshot(nowMs: 9_999), w.MyCycleId, view, new CyclePalette());
+        }
+
+        /// <summary>Exercises every placeholder glyph so the font can be eyeballed.</summary>
+        private static Scene FontProof()
+        {
+            var texts = new List<RenderText>
+            {
+                new RenderText("ABCDEFGHIJKLM", 40, 60,  RenderColor.White, scale: 6),
+                new RenderText("NOPQRSTUVWXYZ", 40, 130, RenderColor.White, scale: 6),
+                new RenderText("0123456789",    40, 200, new RenderColor(124, 252, 0), scale: 6),
+                new RenderText(".,:/-_!?()+=<>%*", 40, 270, new RenderColor(0, 255, 255), scale: 5),
+                new RenderText("CONNECT TO SERVER", 40, 360, new RenderColor(255, 200, 0), scale: 4),
+                new RenderText("HOST: 192.168.68.61", 40, 420, RenderColor.White, scale: 3),
+                new RenderText("PORT: 4534   PING 24MS", 40, 470, RenderColor.White, scale: 3),
+                new RenderText("the quick brown fox 99%", 40, 540, new RenderColor(180, 180, 180), scale: 3),
+            };
+            return new Scene(Array.Empty<RenderSegment>(), Array.Empty<RenderRect>(), texts);
         }
     }
 
     internal sealed class HarnessGame : Microsoft.Xna.Framework.Game
     {
-        private const float ArenaSize = 176.78f;
-        private const float Margin    = 10f;
-        private const int   ViewSize  = 800;
-
         private readonly GraphicsDeviceManager _graphics;
-        private readonly GameWorld _world;
+        private readonly Scene _scene;
+        private readonly int _size;
         private readonly string _outPath;
-        private readonly ArenaView _view = new ArenaView(ArenaSize, Margin, ViewSize);
-        private readonly CyclePalette _palette = new CyclePalette();
 
         private SpriteBatch _spriteBatch = null!;
         private Texture2D _pixel = null!;
         private bool _captured;
 
-        public HarnessGame(GameWorld world, string outPath)
+        public HarnessGame(Scene scene, int size, string outPath)
         {
-            _world = world;
+            _scene = scene;
+            _size = size;
             _outPath = outPath;
             _graphics = new GraphicsDeviceManager(this)
             {
-                PreferredBackBufferWidth = ViewSize,
-                PreferredBackBufferHeight = ViewSize,
+                PreferredBackBufferWidth = size,
+                PreferredBackBufferHeight = size,
             };
         }
 
@@ -93,26 +110,43 @@ namespace Armagetron.Game.RenderHarness
         {
             if (_captured) { Exit(); return; }
 
-            var rt = new RenderTarget2D(GraphicsDevice, ViewSize, ViewSize);
+            var rt = new RenderTarget2D(GraphicsDevice, _size, _size);
             GraphicsDevice.SetRenderTarget(rt);
             GraphicsDevice.Clear(Color.Black);
             _spriteBatch.Begin();
 
-            Scene scene = SceneBuilder.Build(
-                _world.Snapshot(nowMs: 9_999), _world.MyCycleId, _view, _palette);
-
-            foreach (RenderSegment seg in scene.Segments)
+            foreach (RenderSegment seg in _scene.Segments)
                 DrawLine(seg.From, seg.To, ToXna(seg.Color), seg.Thickness);
-            foreach (RenderRect r in scene.Heads)
+            foreach (RenderRect r in _scene.Heads)
                 _spriteBatch.Draw(_pixel, new Rectangle(r.X, r.Y, r.W, r.H), ToXna(r.Color));
+            foreach (RenderText t in _scene.Texts)
+                DrawText(t);
 
             _spriteBatch.End();
             GraphicsDevice.SetRenderTarget(null);
 
             using (var fs = File.Create(_outPath))
-                rt.SaveAsPng(fs, ViewSize, ViewSize);
+                rt.SaveAsPng(fs, _size, _size);
             Console.Error.WriteLine($"wrote {_outPath}");
             _captured = true;
+        }
+
+        // Draw a RenderText one lit glyph-cell at a time (placeholder PixelFont). When the
+        // designer's real font lands this is replaced by a SpriteFont DrawString.
+        private void DrawText(RenderText t)
+        {
+            Color color = ToXna(t.Color);
+            for (int i = 0; i < t.Text.Length; i++)
+            {
+                Glyph g = PixelFont.Get(t.Text[i]);
+                int gx = t.X + i * PixelFont.Advance * t.Scale;
+                for (int row = 0; row < PixelFont.GlyphHeight; row++)
+                    for (int col = 0; col < PixelFont.GlyphWidth; col++)
+                        if (g.IsLit(col, row))
+                            _spriteBatch.Draw(_pixel,
+                                new Rectangle(gx + col * t.Scale, t.Y + row * t.Scale, t.Scale, t.Scale),
+                                color);
+            }
         }
 
         private void DrawLine(Vec2 from, Vec2 to, Color color, float thickness)

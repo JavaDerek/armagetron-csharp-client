@@ -87,14 +87,42 @@ namespace Armagetron.Game
         }
     }
 
+    /// <summary>
+    /// A line of text in SCREEN-pixel coordinates, anchored at its TOP-LEFT (alignment is
+    /// resolved by the view builder using <see cref="PixelFont"/>, so the front-end only has
+    /// to draw glyphs left-to-right from this point). <see cref="Scale"/> multiplies the
+    /// font's native 5×7 cell, e.g. Scale=3 draws 15×21px glyphs.
+    /// </summary>
+    public readonly struct RenderText
+    {
+        public readonly string Text;
+        public readonly int X, Y;
+        public readonly RenderColor Color;
+        public readonly int Scale;
+        public RenderText(string text, int x, int y, RenderColor color, int scale = 2)
+        {
+            Text = text; X = x; Y = y; Color = color; Scale = scale;
+        }
+    }
+
     /// <summary>A frame's worth of draw commands in screen space — no GPU types.</summary>
     public sealed class Scene
     {
+        private static readonly RenderText[] NoTexts = System.Array.Empty<RenderText>();
+
         public IReadOnlyList<RenderSegment> Segments { get; }
         public IReadOnlyList<RenderRect> Heads { get; }
+
+        /// <summary>UI/HUD text overlays, drawn on top of segments and heads.</summary>
+        public IReadOnlyList<RenderText> Texts { get; }
+
         public Scene(IReadOnlyList<RenderSegment> segments, IReadOnlyList<RenderRect> heads)
+            : this(segments, heads, NoTexts) { }
+
+        public Scene(IReadOnlyList<RenderSegment> segments, IReadOnlyList<RenderRect> heads,
+                     IReadOnlyList<RenderText> texts)
         {
-            Segments = segments; Heads = heads;
+            Segments = segments; Heads = heads; Texts = texts;
         }
     }
 
