@@ -64,7 +64,15 @@ namespace Armagetron.Game.Rendering
                         _batch.Draw(_pixel, new Rectangle(r.X + dx, r.Y + dy, r.W, r.H), ToXna(r.Color));
                         break;
                     case RenderSprite s: DrawSprite(s, dx, dy); break;
-                    case RenderText t: _text.Draw(_batch, t, dx, dy); break;
+                    case RenderText t:
+                        TextRenderer.Drawn dn = _text.Draw(_batch, t, dx, dy);
+                        if (t.Caret)
+                        {
+                            int cw = Math.Max(2, t.Scale);
+                            _batch.Draw(_pixel, new Rectangle((int)dn.CaretX + 3, (int)dn.Top, cw, (int)dn.Height),
+                                        ToXna(t.Color));
+                        }
+                        break;
                 }
             }
             _batch.End();

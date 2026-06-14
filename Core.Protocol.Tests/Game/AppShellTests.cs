@@ -159,14 +159,27 @@ namespace Armagetron.Protocol.Tests.Game
         }
 
         [Fact]
-        public void TapPlaying_LeftHalfTurnsLeft_RightHalfTurnsRight()
+        public void TapPlaying_WithTouchControls_LeftHalfTurnsLeft_RightHalfTurnsRight()
         {
             var c = new FakeUiClient();
-            var s = Playing(c);
+            var s = Playing(c, touch: true);
             s.HandleTap(10, H / 2, W, H);            // far left
             s.HandleTap(W - 10, H / 2, W, H);        // far right
             Assert.Equal(1, c.Lefts);
             Assert.Equal(1, c.Rights);
+        }
+
+        [Fact]
+        public void TapPlaying_WithoutTouchControls_DoesNotTurn_DesktopUsesArrowKeys()
+        {
+            var c = new FakeUiClient();
+            var s = Playing(c, touch: false);        // desktop
+            s.HandleTap(10, H / 2, W, H);
+            s.HandleTap(W - 10, H / 2, W, H);
+            Assert.Equal(0, c.Lefts + c.Rights);     // clicks in the arena are ignored
+            // Arrow keys still steer.
+            s.OnTurn(TurnDirection.Left);
+            Assert.Equal(1, c.Lefts);
         }
 
         [Fact]

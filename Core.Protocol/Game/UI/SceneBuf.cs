@@ -19,7 +19,6 @@ namespace Armagetron.Game.UI
     public sealed class SceneBuf
     {
         public const int Pad = 8;            // inner padding for fields/buttons
-        public const int CaretWidth = 2;     // placeholder text caret thickness (pre-scale)
 
         private readonly List<object> _commands = new List<object>();
 
@@ -186,18 +185,12 @@ namespace Armagetron.Game.UI
 
             int textX = f.Bounds.X + Pad;
             int textY = f.Bounds.CenterY;
-            if (f.Value.Length > 0)
-                _commands.Add(new RenderText(f.Value, textX, textY, theme.Text, textScale,
-                                             FontRole.Mono, TextAlign.Left, true));
-
-            if (f.Focused)
-            {
-                int caretX = textX + PixelFont.MeasureWidth(f.Value, textScale)
-                             + (f.Value.Length > 0 ? PixelFont.Spacing * textScale : 0);
-                Fill(new UiRect(caretX, f.Bounds.CenterY - PixelFont.Height(textScale) / 2,
-                                CaretWidth * textScale, PixelFont.Height(textScale)),
-                     theme.Accent);
-            }
+            // Emit the value (mono, vertically centered) with a trailing caret when focused; the
+            // head positions the caret from the REAL measured glyph width so it tracks the text.
+            if (f.Value.Length > 0 || f.Focused)
+                _commands.Add(new RenderText(f.Value, textX, textY,
+                                             f.Focused ? theme.Accent : theme.Text, textScale,
+                                             FontRole.Mono, TextAlign.Left, true, f.Focused));
             return this;
         }
 

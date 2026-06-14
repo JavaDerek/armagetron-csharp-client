@@ -73,13 +73,21 @@ namespace Armagetron.Game.Rendering
             return Font(role, scale).MeasureString(text).X;
         }
 
-        /// <summary>Draw a neutral text command, resolving alignment from the real metrics.
-        /// <paramref name="dx"/>/<paramref name="dy"/> letterbox the gameplay layer (0 for UI).</summary>
-        public void Draw(SpriteBatch batch, RenderText t, int dx, int dy)
+        /// <summary>The screen-space box a drawn line occupies — used to place a trailing caret.</summary>
+        public readonly struct Drawn
         {
-            if (string.IsNullOrEmpty(t.Text)) return;
+            public readonly float CaretX, Top, Height;
+            public Drawn(float caretX, float top, float height) { CaretX = caretX; Top = top; Height = height; }
+        }
+
+        /// <summary>Draw a neutral text command, resolving alignment from the real metrics, and
+        /// return where a caret would sit (right after the glyphs). <paramref name="dx"/>/
+        /// <paramref name="dy"/> letterbox the gameplay layer (0 for UI).</summary>
+        public Drawn Draw(SpriteBatch batch, RenderText t, int dx, int dy)
+        {
             DynamicSpriteFont font = Font(t.Role, t.Scale);
-            Vector2 size = font.MeasureString(t.Text);
+            bool empty = string.IsNullOrEmpty(t.Text);
+            Vector2 size = empty ? new Vector2(0f, font.LineHeight) : font.MeasureString(t.Text);
 
             float x = t.X;
             if (t.Align == TextAlign.Center) x = t.X - size.X / 2f;
@@ -87,8 +95,11 @@ namespace Armagetron.Game.Rendering
 
             float y = t.Middle ? t.Y - size.Y / 2f : t.Y;
 
-            font.DrawText(batch, t.Text, new Vector2(x + dx, y + dy),
-                          new Color(t.Color.R, t.Color.G, t.Color.B, t.Color.A));
+            if (!empty)
+                font.DrawText(batch, t.Text, new Vector2(x + dx, y + dy),
+                              new Color(t.Color.R, t.Color.G, t.Color.B, t.Color.A));
+
+            return new Drawn(x + dx + size.X, y + dy, size.Y);
         }
 
         public void Dispose()

@@ -13,6 +13,8 @@ namespace Armagetron.Game.UI
     {
         public static int TextScale(int h)  => Clamp(h / 240, 2, 6);
         public static int TitleScale(int h) => Clamp(h / 130, 3, 9);
+        /// <summary>Scale of the big HUD round-clock digits (kept narrow enough for the side column).</summary>
+        public static int ClockScale(int ts) => ts * 3;
         private static int Clamp(int v, int lo, int hi) => v < lo ? lo : v > hi ? hi : v;
 
         // ── Connect ───────────────────────────────────────────────────────────────
@@ -96,40 +98,67 @@ namespace Armagetron.Game.UI
         public struct PlayL
         {
             public UiRect Pause, Standings, Ping, Timer, LocalChip;
+            // The centred-square arena occupies [ArenaX, ArenaX+ArenaSide); banners centre on it.
+            public int ArenaX, ArenaY, ArenaSide;
+            // True on a wide (desktop) window: HUD lives in the empty letterbox COLUMNS beside the
+            // arena instead of overlaying it. False on phone-shaped windows → redline corner overlay.
+            public bool SidePanels;
             public int TextScale;
         }
 
-        // Redline 5.2: timer top-center, standings top-left (left 6.5%), ping/connection chip and
-        // pause top-right (right 6.5%), local-player chip bottom-center (bottom 5%).
+        // The arena is a centred square of the shorter edge (matching the head's letterbox). When a
+        // wide side margin exists (desktop) the HUD is laid out in those columns so it never
+        // occludes the play area; otherwise it overlays the arena corners per redline 5.2.
         public static PlayL Play(int w, int h)
         {
             int ts = TextScale(h);
-            int topY = (int)(h * 0.05);
-            int leftX = (int)(w * 0.065);
-            int rightX = w - (int)(w * 0.065);
-            int sset = Clamp(h / 15, 32, 52);
+            int side = Math.Min(w, h);
+            int ax = (w - side) / 2, ay = (h - side) / 2;
+            int margin = ax;                       // left/right letterbox column width
+            int sset = Clamp(side / 16, 34, 56);
+            bool sidePanels = margin >= 220;
 
-            var pause = new UiRect(rightX - sset, topY, sset, sset);
+            // The real TTF mono clock is ~11px per scale-unit tall (bigger than PixelFont's 7), so
+            // size the timer panel from that to avoid clipping the big digits. Clock is drawn at
+            // ClockScale; see HudView.
+            int timerH = 11 * ClockScale(ts) + PixelFont.Height(ts) + 28;
+            int standH = PixelFont.Height(ts) * 2 + 56;
 
-            int standW = Math.Max(260, (int)(w * 0.22));
-            int standH = PixelFont.Height(ts) * 2 + 52;
-            var standings = new UiRect(leftX, topY, standW, standH);
+            UiRect pause, standings, ping, timer, localChip;
+            if (sidePanels)
+            {
+                int pad = 24;
+                int colX = pad, colW = margin - 2 * pad;       // left column
+                int rColX = ax + side + pad, rColW = (w - ax - side) - 2 * pad; // right column
 
-            int pingW = Math.Max(180, (int)(w * 0.13));
-            var ping = new UiRect(pause.X - pingW - 14, topY, pingW, sset);
+                timer     = new UiRect(colX, ay + 14, colW, timerH);
+                standings = new UiRect(colX, timer.Bottom + 16, colW, standH);
+                localChip = new UiRect(colX, ay + side - (sset + 12) - 14, colW, sset + 12);
 
-            int timerW = Math.Max(180, (int)(w * 0.16));
-            int timerH = PixelFont.Height(ts * 4) + PixelFont.Height(ts) + 14;
-            var timer = new UiRect(w / 2 - timerW / 2, (int)(h * 0.04), timerW, timerH);
+                pause = new UiRect(w - pad - sset, ay + 14, sset, sset);
+                ping  = new UiRect(rColX, pause.Bottom + 14, rColW, sset + 6);
+            }
+            else
+            {
+                int topY = ay + (int)(side * 0.05);
+                int leftX = ax + (int)(side * 0.065);
+                int rightX = ax + side - (int)(side * 0.065);
 
-            int chipW = Math.Max(300, (int)(w * 0.24));
-            int chipH = sset + 8;
-            var localChip = new UiRect(w / 2 - chipW / 2, h - (int)(h * 0.05) - chipH, chipW, chipH);
+                pause     = new UiRect(rightX - sset, topY, sset, sset);
+                standings = new UiRect(leftX, topY, Math.Max(220, (int)(side * 0.30)), standH);
+                ping      = new UiRect(pause.X - Math.Max(170, (int)(side * 0.22)) - 12, topY,
+                                       Math.Max(170, (int)(side * 0.22)), sset);
+                int timerW = Math.Max(180, (int)(side * 0.28));
+                timer     = new UiRect(ax + side / 2 - timerW / 2, ay + (int)(side * 0.035), timerW, timerH);
+                int chipW = Math.Max(280, (int)(side * 0.36));
+                localChip = new UiRect(ax + side / 2 - chipW / 2, ay + side - (sset + 10) - (int)(side * 0.05),
+                                       chipW, sset + 10);
+            }
 
             return new PlayL
             {
-                Pause = pause, Standings = standings, Ping = ping, Timer = timer,
-                LocalChip = localChip, TextScale = ts,
+                Pause = pause, Standings = standings, Ping = ping, Timer = timer, LocalChip = localChip,
+                ArenaX = ax, ArenaY = ay, ArenaSide = side, SidePanels = sidePanels, TextScale = ts,
             };
         }
 

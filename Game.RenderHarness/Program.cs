@@ -53,7 +53,8 @@ namespace Armagetron.Game.RenderHarness
         private static List<Layer> ScreenShot(string name)
         {
             var client = new HarnessClient();
-            var shell = new AppShell(client, UiTheme.Default, "192.168.68.61", 4534, "AaBot", touchControls: true);
+            // Desktop-accurate: no touch controls (arrow-key steering, no tap zones / no overlay).
+            var shell = new AppShell(client, UiTheme.Default, "192.168.68.61", 4534, "AaBot", touchControls: false);
             long now = 800;
 
             var conn = Layouts.Connect(W, H).Connect;

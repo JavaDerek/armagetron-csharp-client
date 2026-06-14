@@ -192,14 +192,19 @@ namespace Armagetron.Game
         public readonly TextAlign Align;
         public readonly bool Middle;
 
+        /// <summary>When set, the front-end draws a text caret immediately after the (real-font
+        /// measured) end of this line — so a focused field's caret tracks the glyphs exactly,
+        /// instead of the neutral layer guessing the width.</summary>
+        public readonly bool Caret;
+
         public RenderText(string text, int x, int y, RenderColor color, int scale = 2)
             : this(text, x, y, color, scale, FontRole.Body, TextAlign.Left, false) { }
 
         public RenderText(string text, int x, int y, RenderColor color, int scale,
-                          FontRole role, TextAlign align, bool middle)
+                          FontRole role, TextAlign align, bool middle, bool caret = false)
         {
             Text = text; X = x; Y = y; Color = color; Scale = scale;
-            Role = role; Align = align; Middle = middle;
+            Role = role; Align = align; Middle = middle; Caret = caret;
         }
     }
 

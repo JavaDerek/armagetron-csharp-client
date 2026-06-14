@@ -165,7 +165,7 @@ namespace Armagetron.Protocol.Tests.Game
         }
 
         [Fact]
-        public void DrawField_Focused_DrawsCaret_AndAccentBorder()
+        public void DrawField_Focused_ValueCarriesCaret_AndAccentBorder()
         {
             var theme = UiTheme.Default;
             var f = new UiTextField("n", new UiRect(10, 40, 200, 36), "NAME")
@@ -173,11 +173,21 @@ namespace Armagetron.Protocol.Tests.Game
             var buf = new SceneBuf();
             buf.DrawField(f, theme, 3);
 
-            // Some rect is the accent caret (a thin tall rect with the accent color).
-            Assert.Contains(buf.Rects, r => r.Color.Equals(theme.Accent) && r.W == SceneBuf.CaretWidth * 3);
-            // The label and the value both render as text.
+            // Focused border is the accent color (a rect).
+            Assert.Contains(buf.Rects, r => r.Color.Equals(theme.Accent));
+            // The value text carries the caret flag; the head measures the real font to place it.
+            Assert.Contains(buf.Texts, t => t.Text == "AB" && t.Caret && t.Role == FontRole.Mono);
             Assert.Contains(buf.Texts, t => t.Text == "NAME");
-            Assert.Contains(buf.Texts, t => t.Text == "AB");
+        }
+
+        [Fact]
+        public void DrawField_Focused_Empty_StillEmitsCaret()
+        {
+            var theme = UiTheme.Default;
+            var f = new UiTextField("n", new UiRect(10, 40, 200, 36), "NAME") { Focused = true, Value = "" };
+            var buf = new SceneBuf();
+            buf.DrawField(f, theme, 3);
+            Assert.Contains(buf.Texts, t => t.Text == "" && t.Caret);
         }
 
         [Fact]
@@ -187,6 +197,7 @@ namespace Armagetron.Protocol.Tests.Game
             var f = new UiTextField("n", new UiRect(10, 40, 200, 36), "NAME") { Value = "AB" };
             var buf = new SceneBuf();
             buf.DrawField(f, theme, 3);
+            Assert.DoesNotContain(buf.Texts, t => t.Caret);
             Assert.DoesNotContain(buf.Rects, r => r.Color.Equals(theme.Accent));
         }
 

@@ -81,13 +81,21 @@ namespace Armagetron.Game.UI
                                long now, int w, int h)
         {
             int ts = L.TextScale;
+            int d = PixelFont.Height(ts);
+            int arenaCx = L.ArenaX + L.ArenaSide / 2;   // centre banners on the arena, not the window
 
-            // Round timer (top-center): big mono clock + "ROUND n / 5" caption.
-            buf.TextCenter(match.TimeLabel(now), L.Timer.CenterX, L.Timer.Y, t.Text, ts * 4, FontRole.Mono);
-            buf.TextCenter("ROUND " + match.RoundNumber + " / 5",
-                           L.Timer.CenterX, L.Timer.Bottom - PixelFont.Height(ts), t.TextMuted, ts, FontRole.Label);
+            // Round timer panel: big mono clock + round-status caption. Sits in the side column on
+            // desktop (a real scoreboard panel) so it never covers the arena.
+            buf.Panel(L.Timer);
+            buf.TextCenter(match.TimeLabel(now), L.Timer.CenterX, L.Timer.Y + 14, t.Text,
+                           Layouts.ClockScale(ts), FontRole.Mono);
+            string roundCaption = match.RoundNumber == 0 ? "GET READY"
+                                : !match.RoundActive ? "ROUND OVER"
+                                : "ROUND " + match.RoundNumber + " / 5";
+            buf.TextCenter(roundCaption, L.Timer.CenterX, L.Timer.Bottom - PixelFont.Height(ts) - 8,
+                           match.RoundActive ? t.TextMuted : t.Accent, ts, FontRole.Label);
 
-            // Standings panel (top-left).
+            // Standings panel.
             buf.Panel(L.Standings);
             buf.TextLeft("STANDINGS", L.Standings.X + 18, L.Standings.Y + 16, t.TextMuted, ts, FontRole.Label);
             int rowMid = L.Standings.Y + 20 + PixelFont.Height(ts) + 14;
@@ -96,31 +104,28 @@ namespace Armagetron.Game.UI
             buf.TextRight("x" + match.CycleCount, L.Standings.Right - 22, rowMid - PixelFont.Height(ts) / 2,
                           t.TextMuted, ts, FontRole.Mono);
 
-            // Connection / ping chip (top-right, left of pause).
+            // Connection / ping chip.
             buf.Panel(L.Ping);
             RenderColor dot = status == ConnectionStatus.Connected ? t.Success
                             : status == ConnectionStatus.Connecting ? t.Accent
                                                                     : t.Danger;
-            int d = PixelFont.Height(ts);
-            buf.Fill(new UiRect(L.Ping.X + 12, L.Ping.CenterY - d / 2, d, d), dot);
+            buf.Fill(new UiRect(L.Ping.X + 14, L.Ping.CenterY - d / 2, d, d), dot);
             string conn = status == ConnectionStatus.Connected ? "LIVE"
                         : status == ConnectionStatus.Connecting ? "SYNC" : "DROP";
-            buf.TextLeftMid(conn, L.Ping.X + 12 + d + 10, L.Ping.CenterY, dot, ts, FontRole.Mono);
+            buf.TextLeftMid(conn, L.Ping.X + 14 + d + 10, L.Ping.CenterY, dot, ts, FontRole.Mono);
 
-            // Pause icon (top-right corner).
+            // Pause icon.
             buf.Icon("pause", L.Pause, pad: 4);
 
-            // Round banner: a big centred announcement at round start / round over. (A true
-            // pre-round 3·2·1 countdown needs the desc=24 negative game_time decode.)
-            int bannerY = (int)(h * 0.30);
+            // Round-start flash: a brief centred announcement over the arena (only for ~2.5s, so it
+            // does not sit on the play area between rounds — the persistent status is in the panel).
             if (match.RoundActive && match.ElapsedMs(now) < 2_500)
-                buf.TextCenter("ROUND " + match.RoundNumber, w / 2, bannerY, t.Accent, ts * 3, FontRole.Title);
-            else if (!match.RoundActive && match.RoundNumber > 0)
-                buf.TextCenter("ROUND OVER", w / 2, bannerY, t.Text, ts * 3, FontRole.Title);
+                buf.TextCenter("ROUND " + match.RoundNumber, arenaCx, L.ArenaY + (int)(L.ArenaSide * 0.12),
+                               t.Accent, ts * 3, FontRole.Title);
 
-            // Local-player chip (bottom-center): cyan-bordered pill with the player's name.
             if (match.LocalAlive)
             {
+                // Local-player chip.
                 buf.Panel(L.LocalChip);
                 buf.Fill(new UiRect(L.LocalChip.X + 16, L.LocalChip.CenterY - d / 2, d, d), nameColor);
                 buf.TextLeftMid(playerName, L.LocalChip.X + 16 + d + 12, L.LocalChip.CenterY, t.Text, ts, FontRole.Label);
@@ -129,13 +134,14 @@ namespace Armagetron.Game.UI
             }
             else
             {
-                // Death / spectator overlay (design 5.7): ELIMINATED + a spectating line.
-                buf.TextCenter("ELIMINATED", w / 2, h / 2 - PixelFont.Height(ts * 3), t.Danger, ts * 3, FontRole.Title);
+                // Death / spectator overlay (design 5.7): centred on the arena.
+                int cy = L.ArenaY + L.ArenaSide / 2;
+                buf.TextCenter("ELIMINATED", arenaCx, cy - PixelFont.Height(ts * 3), t.Danger, ts * 3, FontRole.Title);
                 buf.TextCenter("SPECTATING - " + match.CycleCount + " CYCLES",
-                               w / 2, h / 2 + PixelFont.Height(ts), t.TextMuted, ts, FontRole.Label);
+                               arenaCx, cy + PixelFont.Height(ts), t.TextMuted, ts, FontRole.Label);
             }
 
-            // Toast stack (top-left region per design 11), under the standings panel.
+            // Toast stack under the standings panel (design 11, top-left region).
             int toastY = L.Standings.Bottom + 16;
             for (int i = 0; i < toasts.Count; i++)
             {

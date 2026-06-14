@@ -208,7 +208,10 @@ namespace Armagetron.Game.UI
         private void TapPlaying(int x, int y, int w, int h)
         {
             if (Layouts.Play(w, h).Pause.Contains(x, y)) { Screen = AppScreen.Paused; return; }
-            // Anywhere else is a tap-to-turn (Android steering).
+            // Tap-to-turn is a TOUCH affordance only. On desktop (no touch controls) the arena is
+            // steered with the arrow keys, so a mouse click in the play area does nothing — the
+            // left/right zones aren't reserved and the space is reclaimed for the view.
+            if (!_touchControls) return;
             _hasTurned = true;
             if (TapTurnDecider.Decide(x, w) == TurnDirection.Left) _client.TurnLeft();
             else _client.TurnRight();
