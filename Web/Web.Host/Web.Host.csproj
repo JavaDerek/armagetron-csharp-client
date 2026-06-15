@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- The working HTML5 client: a server-rendered web head. The browser is a thin <canvas> that
+       receives the SAME pure Scene the desktop/Android/iOS heads render (built by SceneBuilder in
+       Core.Protocol) as JSON over a WebSocket, and sends turns back. The game session (ArmaClient,
+       real UDP) runs server-side, so this works in ANY browser with no WASM, no special headers,
+       and no threading caveats. The pure-WASM in-browser variant (Web/Game.Web + the verified
+       WebSocketUdpLink/WsRelay transport) is the alternative path documented in Web/README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Armagetron.Web.Host</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\ArmaLib\ArmaLib.csproj" />
+  </ItemGroup>
+
+</Project>

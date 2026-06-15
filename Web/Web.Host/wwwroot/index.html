@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>Armagetron — Web</title>
+  <style>
+    :root { --void:#04060c; --text:#dceaf2; --primary:#1fe3ff; }
+    html, body { margin:0; height:100%; background:var(--void); color:var(--text);
+                 font-family: "Rajdhani", system-ui, sans-serif; overflow:hidden; }
+    #wrap { display:flex; flex-direction:column; align-items:center; justify-content:center;
+            height:100%; gap:10px; }
+    #screen { background:#000; border:1px solid #16223a; image-rendering:pixelated;
+              max-width:100vmin; max-height:90vmin; touch-action:none; }
+    #status { font:600 14px/1 "Share Tech Mono", monospace; color:var(--primary);
+              letter-spacing:1px; text-transform:uppercase; }
+    .hint { color:#647994; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <canvas id="screen" width="720" height="720"></canvas>
+    <div id="status">connecting…</div>
+    <div class="hint">← / → or tap left/right half to turn · drag query ?host=&amp;port=&amp;name= to pick a server</div>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
