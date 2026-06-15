@@ -11,6 +11,28 @@ namespace Armagetron.Game
     }
 
     /// <summary>
+    /// Per-frame camera controls for the 3D views (desktop only). <see cref="CycleMode"/> toggles
+    /// top-down → third-person → first-person; <see cref="ResetView"/> recentres the chase orbit;
+    /// <see cref="OrbitYaw"/>/<see cref="OrbitPitch"/> are mouse-drag deltas (radians) and
+    /// <see cref="Zoom"/> is a scroll delta (world units, negative = closer). Touch heads leave
+    /// this at its zero default and stay top-down.
+    /// </summary>
+    public readonly struct CameraInputState
+    {
+        public readonly bool CycleMode;
+        public readonly bool ResetView;
+        public readonly float OrbitYaw;
+        public readonly float OrbitPitch;
+        public readonly float Zoom;
+
+        public CameraInputState(bool cycleMode, bool resetView, float orbitYaw, float orbitPitch, float zoom)
+        {
+            CycleMode = cycleMode; ResetView = resetView;
+            OrbitYaw = orbitYaw; OrbitPitch = orbitPitch; Zoom = zoom;
+        }
+    }
+
+    /// <summary>
     /// Per-frame platform input for the screen-driven <see cref="ArmagetronGame"/> host. Each
     /// head implements it over its own devices: desktop uses mouse+keyboard+TextInput, Android
     /// uses the touch panel + a soft keyboard. The host stays platform-agnostic — it just
@@ -31,5 +53,9 @@ namespace Armagetron.Game
 
         /// <summary>Apply any pending text editing to the shell's focused field.</summary>
         void ApplyTextEditing(AppShell shell);
+
+        /// <summary>Camera controls for the 3D views this frame. Defaults to no input so touch
+        /// heads (Android) need not implement it and simply stay in top-down mode.</summary>
+        CameraInputState CameraInput() => default;
     }
 }

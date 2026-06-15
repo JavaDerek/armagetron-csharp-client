@@ -60,7 +60,7 @@ good design:
 3. **Pure data in, data out.** `byte[]` / spans → plain structs. UDP sockets,
    threading, and the frame loop live in per-engine adapters, because Unity
    owns its own loop.
-4. **Our own neutral value types** (e.g. `Vec2`). Never `UnityEngine.Vector3`
+4. **Our own neutral value types** (e.g. `Vec2`, `Vec3`). Never `UnityEngine.Vector3`
    or MonoGame `Vector2` in the core; map to those in each front-end.
 5. **Conservative language/runtime surface.** `LangVersion 9`; no reflection /
    `dynamic` / runtime codegen (IL2CPP strips it); avoid APIs newer than
@@ -71,6 +71,24 @@ good design:
 
 When the VR phase arrives, Unity ingests `Core.Protocol` / `Core.Game` either as
 source or as a `netstandard2.1` DLL in `Plugins/`, and adds a VR rig on top.
+
+## Rendering: 2D top-down + 3D perspective views
+
+The same `GameWorld.Snapshot()` feeds two render paths, chosen by `CameraController.Mode`:
+
+- **2D top-down** (`SceneBuilder` → `Scene` → `SceneRenderer`): the original orthographic view;
+  projection is pure math in `ArenaView.ToScreen`, drawn with a `SpriteBatch`.
+- **3D perspective** (`Scene3DBuilder` → `WorldScene` + `Camera3D` pose → `Scene3DRenderer`): a
+  third-person chase cam and a first-person cockpit cam, matching the C++ client. Light walls are the
+  cycle trails extruded vertically; the floor is the tiled arena texture; cycles are placeholder
+  billboards until the Phase-2 model lands (`DESIGN_BRIEF_3D.md`).
+
+Both paths obey the six rules: all geometry/camera decisions are pure, GPU-free, and unit-tested in
+`Core.Protocol` (`Camera3D`, `CameraController`, `Scene3DBuilder`); only the two renderers touch the
+device, and they are `[ExcludeFromCodeCoverage]`, proven by the offscreen PNG harness
+(`Game.RenderHarness 3d-third|3d-first`) and the live-server gate. The 3D camera is desktop-driven
+(`C` cycles the view, `R` recentres, right-drag orbits, scroll zooms); touch heads stay top-down via
+the default `IShellInput.CameraInput()`.
 
 ## Clean-room / licensing posture
 

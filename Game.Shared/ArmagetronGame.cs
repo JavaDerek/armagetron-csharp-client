@@ -30,12 +30,18 @@ namespace Armagetron.Game
         // Arena floor tiling resolution (arena_tile cells per axis).
         private const int GridDivisions = 8;
 
+        // How tall the light walls stand in the 3D views (world units). Empirical, tuned to the
+        // arena scale; replaced by a server-decoded value alongside ArenaSize later.
+        private const float WallHeight = 8f;
+
         private readonly GraphicsDeviceManager _graphics;
-        private TextureStore   _textures = null!;
-        private TextRenderer   _text     = null!;
-        private SceneRenderer  _renderer = null!;
-        private MusicController _music    = null!;
-        private SfxController   _sfx      = null!;
+        private TextureStore    _textures  = null!;
+        private TextRenderer    _text      = null!;
+        private SceneRenderer   _renderer  = null!;
+        private Scene3DRenderer _renderer3d = null!;
+        private MusicController  _music     = null!;
+        private SfxController    _sfx       = null!;
+        private readonly CameraController _camera = new CameraController(CameraSettings.Default);
 
         private readonly string _title;
         private readonly string? _mediaRoot;
@@ -86,7 +92,8 @@ namespace Armagetron.Game
             Window.Title = _title;
             _textures = new TextureStore(GraphicsDevice, _mediaRoot);
             _text     = new TextRenderer(_mediaRoot);
-            _renderer = new SceneRenderer(GraphicsDevice, _textures, _text);
+            _renderer  = new SceneRenderer(GraphicsDevice, _textures, _text);
+            _renderer3d = new Scene3DRenderer(GraphicsDevice, _textures);
             _music    = new MusicController(_mediaRoot);
             _sfx      = new SfxController(_mediaRoot);
             EnsureView();
@@ -116,6 +123,13 @@ namespace Armagetron.Game
             if (_input.BackPressed())                       _shell.OnBack();
             _input.ApplyTextEditing(_shell);
 
+            // Camera controls (desktop): toggle perspective, orbit/zoom the chase cam.
+            CameraInputState cam = _input.CameraInput();
+            if (cam.CycleMode) _camera.NextMode();
+            if (cam.ResetView) _camera.ResetOrbit();
+            if (cam.Zoom != 0f) _camera.Zoom(cam.Zoom);
+            if (cam.OrbitYaw != 0f || cam.OrbitPitch != 0f) _camera.Orbit(cam.OrbitYaw, cam.OrbitPitch);
+
             _snapshot = _client.Snapshot();
             _shell.Tick(_snapshot, _nowMs);
 
@@ -134,6 +148,20 @@ namespace Armagetron.Game
 
         protected override void Draw(GameTime gameTime)
         {
+            // 3D perspective views (third-person chase / first-person cockpit): render the world
+            // from the camera, then the same screen-space HUD overlay on top.
+            if (_shell.ShowsGameplay && _camera.Is3D)
+            {
+                GraphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer, Color.Black, 1f, 0);
+                WorldScene world = Scene3DBuilder.Build(_snapshot, _client.MyCycleId, _palette,
+                                                        ArenaSize, WallHeight);
+                (Vec2 pos, Vec2 dir) = LocalCycle();
+                _renderer3d.Render(world, _camera.Pose(pos, dir), _w, _h);
+                _renderer.Render(_shell.BuildOverlay(_w, _h, _nowMs), 0, 0);
+                base.Draw(gameTime);
+                return;
+            }
+
             GraphicsDevice.Clear(Color.Black);
 
             if (_shell.ShowsGameplay)
@@ -148,11 +176,23 @@ namespace Armagetron.Game
             base.Draw(gameTime);
         }
 
+        // The local cycle's head position/heading for the camera to follow; falls back to the
+        // arena centre looking east before the player's cycle exists (pre-spawn / spectator).
+        private (Vec2 pos, Vec2 dir) LocalCycle()
+        {
+            int myId = _client.MyCycleId;
+            foreach (CycleSnapshot c in _snapshot)
+                if (c.CycleId == myId)
+                    return (c.Position, c.Direction);
+            return (new Vec2(ArenaSize / 2f, ArenaSize / 2f), new Vec2(1, 0));
+        }
+
         protected override void UnloadContent()
         {
             _client.Disconnect();
             _sfx?.Dispose();
             _music?.Dispose();
+            _renderer3d?.Dispose();
             _renderer?.Dispose();
             _text?.Dispose();
             _textures?.Dispose();

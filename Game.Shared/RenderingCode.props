@@ -6,5 +6,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)Rendering\TextureStore.cs" Link="Shared\Rendering\TextureStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Rendering\TextRenderer.cs" Link="Shared\Rendering\TextRenderer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Rendering\SceneRenderer.cs" Link="Shared\Rendering\SceneRenderer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Rendering\Scene3DRenderer.cs" Link="Shared\Rendering\Scene3DRenderer.cs" />
   </ItemGroup>
 </Project>

@@ -28,9 +28,52 @@ namespace Armagetron.Game.RenderHarness
         {
             string scenario = args.Length > 0 ? args[0] : "freeze";
             string outPath  = args.Length > 1 ? args[1] : $"/tmp/aa_render_{scenario}.png";
+
+            // 3D perspective scenarios: render the WorldScene from a fixed camera pose so the
+            // third-person / first-person views can be eyeballed as a PNG with no window.
+            if (scenario == "3d" || scenario == "3d-third" || scenario == "3d-first")
+            {
+                (WorldScene world, CameraPose pose) = Build3D(scenario);
+                using var game3d = new HarnessGame(new List<Layer>(), W, H, outPath, world, pose);
+                game3d.Run();
+                return File.Exists(outPath) ? 0 : 1;
+            }
+
             using var game = new HarnessGame(BuildLayers(scenario), W, H, outPath);
             game.Run();
             return File.Exists(outPath) ? 0 : 1;
+        }
+
+        // Build the demo world plus a camera pose for the requested 3D view.
+        private static (WorldScene, CameraPose) Build3D(string scenario)
+        {
+            const float arena = 176.78f, wall = 8f;
+            (CycleSnapshot[] snap, int myId) = DemoWorld(arena);
+
+            Vec2 pos = new Vec2(arena / 2f, arena / 2f), dir = new Vec2(1, 0);
+            foreach (CycleSnapshot c in snap)
+                if (c.CycleId == myId) { pos = c.Position; dir = c.Direction; }
+
+            var cam = new CameraController(CameraSettings.Default);
+            cam.SetMode(scenario == "3d-first" ? CameraMode.FirstPerson : CameraMode.ThirdPerson);
+
+            WorldScene world = Scene3DBuilder.Build(snap, myId, new CyclePalette(), arena, wall);
+            return (world, cam.Pose(pos, dir));
+        }
+
+        // The same scripted world used by the 2D gameplay shot: a remote cycle that drives east,
+        // turns up and stops on the top wall, plus the local cycle driving east near the bottom.
+        private static (CycleSnapshot[] snap, int myId) DemoWorld(float topWall, bool ghost = false)
+        {
+            var w = new GameWorld();
+            w.SetMyCycleId(5);
+            w.UpdateRemoteCycle(9, new Vec2(10, 40),       new Vec2(1, 0), nowMs: 0,    alive: true,   speed: 30f);
+            w.UpdateRemoteCycle(9, new Vec2(120, 40),      new Vec2(1, 0), nowMs: 1000, alive: true,   speed: 30f);
+            w.UpdateRemoteCycle(9, new Vec2(120, 90),      new Vec2(0, 1), nowMs: 2000, alive: true,   speed: 30f);
+            w.UpdateRemoteCycle(9, new Vec2(120, topWall), new Vec2(0, 1), nowMs: 3000, alive: ghost,  speed: 30f);
+            w.MoveLocalCycle(5, new Vec2(40, 12), new Vec2(1, 0));
+            w.MoveLocalCycle(5, new Vec2(90, 12), new Vec2(1, 0));
+            return (w.Snapshot(nowMs: 9_999), w.MyCycleId);
         }
 
         private static List<Layer> BuildLayers(string scenario) => scenario switch
@@ -110,21 +153,10 @@ namespace Armagetron.Game.RenderHarness
         /// </summary>
         private static Scene Gameplay(string scenario, int side)
         {
-            bool alive = scenario == "ghost";
             const float topWall = 176.78f;
-
-            var w = new GameWorld();
-            w.SetMyCycleId(5);
-            w.UpdateRemoteCycle(9, new Vec2(10, 40),       new Vec2(1, 0), nowMs: 0,    alive: true,  speed: 30f);
-            w.UpdateRemoteCycle(9, new Vec2(120, 40),      new Vec2(1, 0), nowMs: 1000, alive: true,  speed: 30f);
-            w.UpdateRemoteCycle(9, new Vec2(120, 90),      new Vec2(0, 1), nowMs: 2000, alive: true,  speed: 30f);
-            w.UpdateRemoteCycle(9, new Vec2(120, topWall), new Vec2(0, 1), nowMs: 3000, alive: alive, speed: 30f);
-            w.MoveLocalCycle(5, new Vec2(40, 12), new Vec2(1, 0));
-            w.MoveLocalCycle(5, new Vec2(90, 12), new Vec2(1, 0));
-
+            (CycleSnapshot[] snap, int myId) = DemoWorld(topWall, ghost: scenario == "ghost");
             var view = new ArenaView(arenaSize: topWall, margin: 10f, viewSize: side);
-            return SceneBuilder.BuildWithArt(w.Snapshot(nowMs: 9_999), w.MyCycleId, view,
-                                             new CyclePalette(), divisions: 8);
+            return SceneBuilder.BuildWithArt(snap, myId, view, new CyclePalette(), divisions: 8);
         }
 
         /// <summary>Exercises every placeholder glyph so the font can be eyeballed.</summary>
@@ -172,17 +204,24 @@ namespace Armagetron.Game.RenderHarness
         private readonly int _w, _h;
         private readonly string _outPath;
 
+        private readonly WorldScene? _world3d;
+        private readonly CameraPose _pose3d;
+
         private TextureStore _textures = null!;
         private TextRenderer _text = null!;
         private SceneRenderer _renderer = null!;
+        private Scene3DRenderer _renderer3d = null!;
         private bool _captured;
 
-        public HarnessGame(List<Program.Layer> layers, int w, int h, string outPath)
+        public HarnessGame(List<Program.Layer> layers, int w, int h, string outPath,
+                           WorldScene? world3d = null, CameraPose pose3d = default)
         {
             _layers = layers;
             _w = w;
             _h = h;
             _outPath = outPath;
+            _world3d = world3d;
+            _pose3d = pose3d;
             _graphics = new GraphicsDeviceManager(this)
             {
                 PreferredBackBufferWidth = w,
@@ -195,15 +234,20 @@ namespace Armagetron.Game.RenderHarness
             _textures = new TextureStore(GraphicsDevice);
             _text = new TextRenderer();
             _renderer = new SceneRenderer(GraphicsDevice, _textures, _text);
+            _renderer3d = new Scene3DRenderer(GraphicsDevice, _textures);
         }
 
         protected override void Update(GameTime gameTime)
         {
             if (_captured) { Exit(); return; }
 
-            var rt = new RenderTarget2D(GraphicsDevice, _w, _h);
+            var rt = new RenderTarget2D(GraphicsDevice, _w, _h, false,
+                                        SurfaceFormat.Color, DepthFormat.Depth24);
             GraphicsDevice.SetRenderTarget(rt);
-            GraphicsDevice.Clear(Color.Black);
+            GraphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer, Color.Black, 1f, 0);
+
+            if (_world3d != null)
+                _renderer3d.Render(_world3d, _pose3d, _w, _h);
 
             foreach (Program.Layer layer in _layers)
                 _renderer.Render(layer.Scene, layer.Dx, layer.Dy);
@@ -218,6 +262,7 @@ namespace Armagetron.Game.RenderHarness
 
         protected override void UnloadContent()
         {
+            _renderer3d?.Dispose();
             _renderer?.Dispose();
             _text?.Dispose();
             _textures?.Dispose();
