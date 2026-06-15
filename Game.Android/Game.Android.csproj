@@ -16,6 +16,11 @@
          here; suppress it so the solution's -warnaserror build (build-and-test.sh) is not
          broken by a third-party artifact. Revisit when MonoGame ships a 16 KB-aligned .so. -->
     <NoWarn>$(NoWarn);XA0141</NoWarn>
+    <!-- Music plays straight from the APK via AssetManager.OpenFd (MonoGame's Android Song),
+         which needs a raw file descriptor — i.e. the asset must be stored UNCOMPRESSED. .ogg is
+         in aapt's default no-compress set, but make it explicit so OpenFd can't regress to a
+         "compressed asset has no FD" failure (silent music). -->
+    <AndroidStoreUncompressedFileExtensions>.ogg</AndroidStoreUncompressedFileExtensions>
   </PropertyGroup>
 
   <ItemGroup>

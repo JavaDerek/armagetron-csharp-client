@@ -27,11 +27,11 @@ namespace Armagetron.Game.Audio
             string dir = Path.Combine(root, "audio", "music");
             // OGG Vorbis is what MonoGame DesktopGL/Android decode natively (the audio manifest's
             // "Music OGG list"); the shipped .mp3 masters are transcoded alongside. Prefer .ogg.
-            _menu = TryLoad(dir, "Refestramus - Intourist - 01 - DMK", "menu-music");
-            _game = TryLoad(dir, "Refestramus - Intourist - 02 - Asuncion", "game-music");
+            _menu = TryLoad(dir, "Refestramus-Intourist-01-DMK");
+            _game = TryLoad(dir, "Refestramus-Intourist-02-Asuncion");
         }
 
-        private static Song? TryLoad(string dir, string baseName, string name)
+        private static Song? TryLoad(string dir, string baseName)
         {
             foreach (string ext in new[] { ".ogg", ".mp3" })
             {
@@ -39,7 +39,12 @@ namespace Armagetron.Game.Audio
                 if (!File.Exists(path)) continue;
                 try
                 {
-                    return Song.FromUri(name, new Uri(path));
+                    // Cross-platform Song.FromUri(name, uri): MonoGame's Android Song plays via
+                    // AssetManager.OpenFd(name) (FromUri sets _name = the 1st arg, assetUri stays
+                    // null), so the name MUST be the APK asset-relative path bundled in the APK.
+                    // Desktop ignores the name and plays from the uri (the unpacked/copied file).
+                    string assetPath = $"media/audio/music/{baseName}{ext}";
+                    return Song.FromUri(assetPath, new Uri(path));
                 }
                 catch (Exception ex)
                 {
