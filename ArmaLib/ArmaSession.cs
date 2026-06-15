@@ -66,8 +66,14 @@ namespace Armagetron.Lib
             // Our OWN cycle is client-predicted (rendered from dead-reckoning in
             // MaybeSendCycleCommand), so we deliberately ignore server syncs for it in the
             // world model — feeding the server direction alongside the predicted one is what
-            // produced the old garbled-trail bug. Remote cycles are server-driven.
-            if (cycleId == _myCycleId) return;
+            // produced the old garbled-trail bug. The ONE exception is the death sync: pin our
+            // head to the server's crash point and freeze it, or client prediction coasts the
+            // cycle a few units past the wall it just hit. Remote cycles are server-driven.
+            if (cycleId == _myCycleId)
+            {
+                if (!alive) _world.KillLocalCycle(_myCycleId, pos);
+                return;
+            }
             _world.UpdateRemoteCycle(cycleId, pos, dir, MonoClock.NowMs(), alive, speed);
         }
 

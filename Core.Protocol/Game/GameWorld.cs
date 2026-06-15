@@ -70,10 +70,32 @@ namespace Armagetron.Game
             lock (_lock)
             {
                 var c = GetOrCreate(cycleId, pos);
+                // A dead local cycle is frozen at its crash point (see KillLocalCycle): the
+                // upstream predictor keeps dead-reckoning for a few ticks after the death sync,
+                // and applying those would glide the head past the wall it just hit.
+                if (!c.Alive) return;
                 c.Position     = pos;
                 c.Direction    = dir;
                 c.HasDirection = true;
                 c.IsRemote     = false;
+            }
+        }
+
+        /// <summary>
+        /// Mark the local (client-predicted) cycle dead and pin its head to the server's
+        /// authoritative crash point <paramref name="deathPos"/>. After this, <see
+        /// cref="MoveLocalCycle"/> is a no-op until the next <see cref="ClearRound"/>, so the
+        /// head stops exactly at impact instead of coasting forward. This is the local-cycle
+        /// counterpart to the remote death freeze in <see cref="UpdateRemoteCycle"/>.
+        /// </summary>
+        public void KillLocalCycle(int cycleId, Vec2 deathPos)
+        {
+            lock (_lock)
+            {
+                var c = GetOrCreate(cycleId, deathPos);
+                c.Position = deathPos;
+                c.IsRemote = false;
+                c.Alive    = false;
             }
         }
 

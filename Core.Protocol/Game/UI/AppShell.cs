@@ -25,6 +25,7 @@ namespace Armagetron.Game.UI
         private readonly UiTextField _host, _port, _name;
         private string? _error;
         private bool _hasTurned;
+        private bool _localCycleWasPresent;
         private AppScreen _settingsReturn = AppScreen.Connect;
 
         private readonly ToastQueue _toasts = new ToastQueue();
@@ -110,6 +111,26 @@ namespace Armagetron.Game.UI
                     Sfx.Push(SfxId.ConnectFail);
                 }
             }
+
+            // Round timer fallback: the authoritative RoundStart above (desc=24 round-phase) is
+            // not reliably delivered live, leaving the HUD clock stuck at 0:00. Our local cycle
+            // spawning into the snapshot IS a reliable per-round signal, so start the round on
+            // its absent→present edge — but only if a real RoundStart event hasn't already done
+            // so this frame (RoundActive guard), so genuine events still take precedence and the
+            // round count isn't doubled.
+            bool localPresent = LocalCycleInSnapshot(snapshot);
+            if (localPresent && !_localCycleWasPresent && Screen == AppScreen.Playing && !Match.RoundActive)
+                Match.OnRoundStart(nowMs);
+            _localCycleWasPresent = localPresent;
+        }
+
+        private bool LocalCycleInSnapshot(CycleSnapshot[] snapshot)
+        {
+            int id = _client.MyCycleId;
+            if (id < 0) return false;
+            foreach (CycleSnapshot c in snapshot)
+                if (c.CycleId == id) return true;
+            return false;
         }
 
         // ── Round lifecycle (host forwards client events here) ────────────────────

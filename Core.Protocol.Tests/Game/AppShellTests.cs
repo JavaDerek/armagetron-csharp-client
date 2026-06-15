@@ -583,6 +583,74 @@ namespace Armagetron.Protocol.Tests.Game
             Assert.DoesNotContain(SfxId.Win, lost);
         }
 
+        // ── Round timer: starts on local-cycle spawn even without a RoundStart event ─
+
+        private static CycleSnapshot Cyc(int id) =>
+            new CycleSnapshot { CycleId = id, Trail = Array.Empty<Vec2>() };
+
+        [Fact]
+        public void Timer_StartsOnLocalCycleSpawn_WhenNoRoundStartEventArrives()
+        {
+            var c = new FakeUiClient();
+            var s = Playing(c);
+            Assert.False(s.Match.RoundActive);
+            Assert.Equal("0:00", s.Match.TimeLabel(5_000));
+
+            // The local cycle spawns into the snapshot (no MatchEvent.RoundStart from the server).
+            c.MyCycleId = 5;
+            c.Snap = new[] { Cyc(5) };
+            s.Tick(c.Snap, 1_000);
+
+            Assert.True(s.Match.RoundActive);
+            Assert.Equal(1, s.Match.RoundNumber);
+            Assert.Equal("0:02", s.Match.TimeLabel(3_000)); // 3000 − 1000 = 2s elapsed
+        }
+
+        [Fact]
+        public void Timer_DoesNotRestart_WhileTheCyclePersists()
+        {
+            var c = new FakeUiClient { MyCycleId = 5, Snap = new[] { Cyc(5) } };
+            var s = Playing(c);
+            s.Tick(c.Snap, 1_000);                  // spawn → round starts at t=1000
+            s.Tick(c.Snap, 2_000);                  // still present — must NOT re-start
+            s.Tick(c.Snap, 3_000);
+
+            Assert.Equal(1, s.Match.RoundNumber);    // not incremented per-frame
+            Assert.Equal("0:03", s.Match.TimeLabel(4_000)); // still timing from t=1000
+        }
+
+        [Fact]
+        public void Timer_RealRoundStartEvent_TakesPrecedence_NoDoubleCount()
+        {
+            var c = new FakeUiClient { MyCycleId = 5, Snap = new[] { Cyc(5) } };
+            var s = Playing(c);
+            c.Events.Enqueue(MatchEvent.RoundStart);
+            s.Tick(c.Snap, 1_000);                  // event + spawn in the same frame
+
+            Assert.True(s.Match.RoundActive);
+            Assert.Equal(1, s.Match.RoundNumber);    // counted once, not twice
+        }
+
+        [Fact]
+        public void Timer_RestartsOnRespawn_AfterRoundEnd()
+        {
+            var c = new FakeUiClient { MyCycleId = 5, Snap = new[] { Cyc(5) } };
+            var s = Playing(c);
+            s.Tick(c.Snap, 1_000);                  // round 1 spawn
+            Assert.Equal(1, s.Match.RoundNumber);
+
+            c.Events.Enqueue(MatchEvent.RoundEnd);
+            c.Snap = Array.Empty<CycleSnapshot>();   // ClearRound wiped the cycle
+            s.Tick(c.Snap, 5_000);
+            Assert.False(s.Match.RoundActive);
+
+            c.Snap = new[] { Cyc(5) };               // next round: cycle respawns
+            s.Tick(c.Snap, 6_000);
+            Assert.True(s.Match.RoundActive);
+            Assert.Equal(2, s.Match.RoundNumber);
+            Assert.Equal("0:01", s.Match.TimeLabel(7_000));
+        }
+
         [Fact]
         public void EngineRunning_TrueWhilePlayingAndAlive_FalseOtherwise()
         {

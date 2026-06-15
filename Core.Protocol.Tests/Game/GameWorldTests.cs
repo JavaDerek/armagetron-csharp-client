@@ -297,5 +297,46 @@ namespace Armagetron.Protocol.Tests.Game
             w.TurnLocalCycle(5, new Vec2(0, 0), new Vec2(0, 1));
             Assert.Equal(trailLenBefore, before.Trail.Length);
         }
+
+        // ── Local death freeze: the cycle must stop dead, not glide past impact ──
+
+        [Fact]
+        public void KillLocalCycle_PinsHeadToServerDeathPosition()
+        {
+            var w = NewWorldOwning(5);
+            w.MoveLocalCycle(5, new Vec2(20, 10), new Vec2(1, 0));
+
+            // The server's death sync carries the authoritative crash point.
+            w.KillLocalCycle(5, new Vec2(22, 10));
+            Assert.Equal(new Vec2(22, 10), SnapOf(w, 5).Position);
+        }
+
+        [Fact]
+        public void MoveLocalCycle_AfterDeath_IsIgnored_SoTheHeadDoesNotGlide()
+        {
+            var w = NewWorldOwning(5);
+            w.MoveLocalCycle(5, new Vec2(20, 10), new Vec2(1, 0));
+            w.KillLocalCycle(5, new Vec2(22, 10));
+
+            // The upstream predictor keeps dead-reckoning for a few more ticks; those moves
+            // must be dropped so the rendered head stays frozen at the crash point.
+            w.MoveLocalCycle(5, new Vec2(24, 10), new Vec2(1, 0));
+            w.MoveLocalCycle(5, new Vec2(26, 10), new Vec2(1, 0));
+            Assert.Equal(new Vec2(22, 10), SnapOf(w, 5).Position);
+        }
+
+        [Fact]
+        public void ClearRound_AfterDeath_RevivesLocalCycle_ForTheNextRound()
+        {
+            var w = NewWorldOwning(5);
+            w.MoveLocalCycle(5, new Vec2(20, 10), new Vec2(1, 0));
+            w.KillLocalCycle(5, new Vec2(22, 10));
+
+            // A new round wipes the world; the respawned cycle must move normally again.
+            w.ClearRound();
+            w.MoveLocalCycle(5, new Vec2(0, 0), new Vec2(1, 0));
+            w.MoveLocalCycle(5, new Vec2(3, 0), new Vec2(1, 0));
+            Assert.Equal(new Vec2(3, 0), SnapOf(w, 5).Position);
+        }
     }
 }
