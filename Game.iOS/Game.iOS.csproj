@@ -1,0 +1,82 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ┌───────────────────────────────────────────────────────────────────────────────────┐
+       │ iPhone/iPad head. STARTED 2026-06-14 — scaffolded, NOT yet compiled here: this Mac  │
+       │ has only the `android` dotnet workload and Command-Line-Tools (no full Xcode), so    │
+       │ `net9.0-ios` cannot build in this environment. It is therefore deliberately kept     │
+       │ OUT of ArmagetronClient.sln so build-and-test.sh stays green. To build it:           │
+       │   1. Install Xcode (full app) + `sudo xcode-select -s /Applications/Xcode.app`       │
+       │   2. `dotnet workload install ios`                                                   │
+       │   3. `dotnet build Game.iOS/Game.iOS.csproj -c Release`  (device build needs signing)│
+       │ The structure mirrors the proven Game.Android head one-to-one; see README.md.        │
+       └───────────────────────────────────────────────────────────────────────────────────┘ -->
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-ios</TargetFramework>
+    <SupportedOSPlatformVersion>13.0</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Armagetron.iOS</RootNamespace>
+    <AssemblyName>Armagetron.iOS</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <ApplicationId>com.armagetron.client</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The same platform-agnostic MonoGame host the desktop & Android heads use. The MonoGame
+         API surface (Microsoft.Xna.Framework.*) is identical across DesktopGL / Android / iOS,
+         so these source files compile unchanged on all three. -->
+    <Compile Include="..\Game.Shared\ArmagetronGame.cs" Link="Shared\ArmagetronGame.cs" />
+    <Compile Include="..\Game.Shared\IShellInput.cs" Link="Shared\IShellInput.cs" />
+    <Compile Include="..\Game.Shared\Audio\MusicController.cs" Link="Shared\Audio\MusicController.cs" />
+    <Compile Include="..\Game.Shared\Audio\SfxController.cs" Link="Shared\Audio\SfxController.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FontStashSharp.MonoGame" Version="1.5.6" />
+    <PackageReference Include="MonoGame.Framework.iOS" Version="3.8.1.303" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- iOS talks to the server only through ArmaLib, exactly like the desktop & Android heads;
+         ArmaLib transitively brings in Core.Protocol's render model + touch-input types. -->
+    <ProjectReference Include="..\ArmaLib\ArmaLib.csproj" />
+  </ItemGroup>
+
+  <!-- Same shared render glue the other heads compile (TextureStore, TextRenderer, SceneRenderer,
+       Scene3DRenderer). -->
+  <Import Project="..\Game.Shared\RenderingCode.props" />
+
+  <!-- The designer's media shipped INSIDE the .app bundle as BundleResource, preserving the
+       media/… tree so the shared loaders (which read a filesystem media root) find it. Unlike
+       Android there is NO unpack step: an iOS bundle IS a readable directory, so the head just
+       points mediaRoot at NSBundle.MainBundle.BundlePath/media (see AppDelegate). We ship only
+       what the loaders read — fonts (.ttf), nine-slice + in-game + icon (-2x) + splash PNGs,
+       music .ogg, sfx .wav — and skip the .mp3 masters. LogicalName controls the in-bundle path. -->
+  <ItemGroup>
+    <BundleResource Include="..\media\fonts\**\*.ttf">
+      <LogicalName>media/fonts/%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
+    </BundleResource>
+    <BundleResource Include="..\media\nine-slice\*_9slice.png">
+      <LogicalName>media/nine-slice/%(Filename)%(Extension)</LogicalName>
+    </BundleResource>
+    <BundleResource Include="..\media\in-game\*.png">
+      <LogicalName>media/in-game/%(Filename)%(Extension)</LogicalName>
+    </BundleResource>
+    <BundleResource Include="..\media\icons\png\**\*-2x.png">
+      <LogicalName>media/icons/png/%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
+    </BundleResource>
+    <BundleResource Include="..\media\splash\splash_1080.png">
+      <LogicalName>media/splash/splash_1080.png</LogicalName>
+    </BundleResource>
+    <BundleResource Include="..\media\audio\music\*.ogg">
+      <LogicalName>media/audio/music/%(Filename)%(Extension)</LogicalName>
+    </BundleResource>
+    <BundleResource Include="..\media\audio\sfx\*.wav">
+      <LogicalName>media/audio/sfx/%(Filename)%(Extension)</LogicalName>
+    </BundleResource>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "com.unity.xr.openxr": "1.11.0",
+    "com.unity.xr.management": "4.5.0",
+    "com.unity.xr.interaction.toolkit": "3.0.5",
+    "com.unity.inputsystem": "1.8.2",
+    "com.unity.render-pipelines.universal": "17.0.3",
+    "com.unity.modules.audio": "1.0.0",
+    "com.unity.modules.physics": "1.0.0",
+    "com.unity.modules.uielements": "1.0.0"
+  },
+  "comment": "Meta Quest: enable the Meta Quest feature group under Project Settings > XR Plug-in Management > OpenXR (Android tab). For richer Meta features add the Meta XR SDK (com.meta.xr.sdk.core) from the Unity Asset Store / Meta's registry. Versions target Unity 6 (6000.0 LTS); adjust to your installed editor."
+}
