@@ -39,8 +39,30 @@
     <ProjectReference Include="..\ArmaLib\ArmaLib.csproj" />
   </ItemGroup>
 
-  <!-- Same shared render glue the desktop head compiles. Media files are packaged as Android
-       assets in phase 6; the loaders degrade gracefully until then. -->
+  <!-- Same shared render glue the desktop head compiles. -->
   <Import Project="..\Game.Shared\RenderingCode.props" />
+
+  <!-- Phase 6: the designer's media bundled INTO the APK as Android assets (the desktop heads
+       copy the same files next to the binary via MediaContent.props; Android has no such tree,
+       so it ships them in assets/ and Activity1 unpacks them to filesDir on launch). We bundle
+       only what the loaders read — fonts (.ttf), nine-slice + in-game + icon (-2x) + splash
+       PNGs, music .ogg, sfx .wav — and skip the source .mp3 masters. Assets land at
+       assets/media/... so AssetManager sees them under "media/…". -->
+  <ItemGroup>
+    <AndroidAsset Include="..\media\fonts\**\*.ttf"
+                  Link="Assets\media\fonts\%(RecursiveDir)%(Filename)%(Extension)" />
+    <AndroidAsset Include="..\media\nine-slice\*_9slice.png"
+                  Link="Assets\media\nine-slice\%(Filename)%(Extension)" />
+    <AndroidAsset Include="..\media\in-game\*.png"
+                  Link="Assets\media\in-game\%(Filename)%(Extension)" />
+    <AndroidAsset Include="..\media\icons\png\**\*-2x.png"
+                  Link="Assets\media\icons\png\%(RecursiveDir)%(Filename)%(Extension)" />
+    <AndroidAsset Include="..\media\splash\splash_1080.png"
+                  Link="Assets\media\splash\splash_1080.png" />
+    <AndroidAsset Include="..\media\audio\music\*.ogg"
+                  Link="Assets\media\audio\music\%(Filename)%(Extension)" />
+    <AndroidAsset Include="..\media\audio\sfx\*.wav"
+                  Link="Assets\media\audio\sfx\%(Filename)%(Extension)" />
+  </ItemGroup>
 
 </Project>

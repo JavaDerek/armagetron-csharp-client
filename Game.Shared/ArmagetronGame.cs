@@ -38,6 +38,7 @@ namespace Armagetron.Game
         private SfxController   _sfx      = null!;
 
         private readonly string _title;
+        private readonly string? _mediaRoot;
         private readonly IUiClient _client;
         private readonly IShellInput _input;
         private readonly AppShell _shell;
@@ -54,12 +55,16 @@ namespace Armagetron.Game
         /// resolution (Android); otherwise an 800×800 window is requested (desktop).
         /// </summary>
         public ArmagetronGame(IUiClient client, IShellInput input, AppShell shell,
-                              string title, bool fullscreen = false)
+                              string title, bool fullscreen = false, string? mediaRoot = null)
         {
             _client = client;
             _input  = input;
             _shell  = shell;
             _title  = title;
+            // Where the loaders read fonts/textures/audio. Desktop leaves this null (the loaders
+            // default to "<binary>/media", populated by MediaContent.props). Android passes the
+            // dir it unpacks its bundled assets into, since the APK has no such filesystem tree.
+            _mediaRoot = mediaRoot;
 
             _graphics = new GraphicsDeviceManager(this);
             if (fullscreen)
@@ -79,11 +84,11 @@ namespace Armagetron.Game
         protected override void LoadContent()
         {
             Window.Title = _title;
-            _textures = new TextureStore(GraphicsDevice);
-            _text     = new TextRenderer();
+            _textures = new TextureStore(GraphicsDevice, _mediaRoot);
+            _text     = new TextRenderer(_mediaRoot);
             _renderer = new SceneRenderer(GraphicsDevice, _textures, _text);
-            _music    = new MusicController();
-            _sfx      = new SfxController();
+            _music    = new MusicController(_mediaRoot);
+            _sfx      = new SfxController(_mediaRoot);
             EnsureView();
         }
 
