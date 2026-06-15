@@ -34,6 +34,15 @@ namespace Armagetron.Game.UI
         public SettingsState Settings { get; } = new SettingsState();
         public bool ExitRequested { get; private set; }
 
+        /// <summary>One-shot SFX cues pushed at game moments; the host drains and plays them
+        /// once per frame (honoring <see cref="SettingsState.Sound"/>).</summary>
+        public SfxCueQueue Sfx { get; } = new SfxCueQueue();
+
+        /// <summary>True when the looping engine hum should sound: in a live match with the
+        /// local cycle still alive. The host starts/stops the <see cref="SfxId.EngineLoop"/>
+        /// instance from this each frame (like the music loop).</summary>
+        public bool EngineRunning => Screen == AppScreen.Playing && Match.LocalAlive;
+
         /// <summary>The chosen player name (used by the HUD and as the connect identity).</summary>
         public string PlayerName => _name.Value;
 
@@ -68,13 +77,20 @@ namespace Armagetron.Game.UI
                     case MatchEvent.RoundStart:
                         Match.OnRoundStart(nowMs);
                         _toasts.Push("ROUND " + Match.RoundNumber, _theme.Accent, nowMs);
+                        // "GO" cue resolves the start; the 3·2·1 countdown beeps are a timed
+                        // pre-roll the protocol doesn't surface yet, so they stay a manual cue.
+                        Sfx.Push(SfxId.Go);
                         break;
                     case MatchEvent.RoundEnd:
+                        // Win/lose is read BEFORE OnRoundEnd off LocalAlive — survived = win.
+                        // A LocalDied earlier in this same drain already flipped it to false.
+                        Sfx.Push(Match.LocalAlive ? SfxId.Win : SfxId.Lose);
                         Match.OnRoundEnd();
                         _toasts.Push("ROUND OVER", _theme.Text, nowMs);
                         break;
                     case MatchEvent.LocalDied:
                         Match.OnLocalDied();
+                        Sfx.Push(SfxId.Explosion);
                         _toasts.Push("YOU CRASHED", _theme.Danger, nowMs);
                         break;
                 }
@@ -82,11 +98,16 @@ namespace Armagetron.Game.UI
 
             if (Screen == AppScreen.Connecting)
             {
-                if (_client.Status == ConnectionStatus.Connected) { Screen = AppScreen.Playing; _error = null; }
+                if (_client.Status == ConnectionStatus.Connected)
+                {
+                    Screen = AppScreen.Playing; _error = null;
+                    Sfx.Push(SfxId.ConnectOk);
+                }
                 else if (_client.Status == ConnectionStatus.Failed)
                 {
                     Screen = AppScreen.Connect;
                     _error = _client.LastError ?? "COULD NOT CONNECT";
+                    Sfx.Push(SfxId.ConnectFail);
                 }
             }
         }
@@ -119,6 +140,7 @@ namespace Armagetron.Game.UI
         {
             if (Screen != AppScreen.Playing) return;
             _hasTurned = true;
+            Sfx.Push(SfxId.Turn);
             if (dir == TurnDirection.Left) _client.TurnLeft(); else _client.TurnRight();
         }
 
@@ -207,12 +229,13 @@ namespace Armagetron.Game.UI
 
         private void TapPlaying(int x, int y, int w, int h)
         {
-            if (Layouts.Play(w, h).Pause.Contains(x, y)) { Screen = AppScreen.Paused; return; }
+            if (Layouts.Play(w, h).Pause.Contains(x, y)) { Sfx.Push(SfxId.UiTap); Screen = AppScreen.Paused; return; }
             // Tap-to-turn is a TOUCH affordance only. On desktop (no touch controls) the arena is
             // steered with the arrow keys, so a mouse click in the play area does nothing — the
             // left/right zones aren't reserved and the space is reclaimed for the view.
             if (!_touchControls) return;
             _hasTurned = true;
+            Sfx.Push(SfxId.Turn);
             if (TapTurnDecider.Decide(x, w) == TurnDirection.Left) _client.TurnLeft();
             else _client.TurnRight();
         }
@@ -326,6 +349,7 @@ namespace Armagetron.Game.UI
         {
             int port = int.Parse(_port.Value);
             _error = null;
+            Sfx.Push(SfxId.UiTap);
             _client.BeginConnect(_host.Value.Trim(), port, _name.Value.Trim());
             Screen = AppScreen.Connecting;
         }

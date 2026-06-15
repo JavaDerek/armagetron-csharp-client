@@ -16,5 +16,9 @@
              Link="media\splash\splash_1080.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="$(MSBuildThisFileDirectory)..\media\audio\music\*.ogg"
              Link="media\audio\music\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <!-- SFX ship as uncompressed WAV: SoundEffect.FromStream (the low-latency sfx path) only
+         decodes WAV, not ogg/mp3. Music stays ogg above; they are different audio engines. -->
+    <Content Include="$(MSBuildThisFileDirectory)..\media\audio\sfx\*.wav"
+             Link="media\audio\sfx\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

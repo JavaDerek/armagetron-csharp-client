@@ -35,6 +35,7 @@ namespace Armagetron.Game
         private TextRenderer   _text     = null!;
         private SceneRenderer  _renderer = null!;
         private MusicController _music    = null!;
+        private SfxController   _sfx      = null!;
 
         private readonly string _title;
         private readonly IUiClient _client;
@@ -82,6 +83,7 @@ namespace Armagetron.Game
             _text     = new TextRenderer();
             _renderer = new SceneRenderer(GraphicsDevice, _textures, _text);
             _music    = new MusicController();
+            _sfx      = new SfxController();
             EnsureView();
         }
 
@@ -115,6 +117,11 @@ namespace Armagetron.Game
             // Music: in-match loop while gameplay shows, menu loop otherwise; silent if toggled off.
             _music.Update(_shell.Settings.Music, _shell.ShowsGameplay);
 
+            // SFX: play the one-shot cues the shell queued this frame, and run/stop the engine
+            // hum from EngineRunning — both gated by the Sound toggle.
+            _sfx.PlayCues(_shell.Sfx.Drain(), _shell.Settings.Sound);
+            _sfx.SetEngine(_shell.EngineRunning, _shell.Settings.Sound);
+
             if (_shell.ExitRequested) Exit();
 
             base.Update(gameTime);
@@ -139,6 +146,7 @@ namespace Armagetron.Game
         protected override void UnloadContent()
         {
             _client.Disconnect();
+            _sfx?.Dispose();
             _music?.Dispose();
             _renderer?.Dispose();
             _text?.Dispose();

@@ -3,9 +3,12 @@ using Armagetron.Game.UI;
 using Armagetron.Lib;
 
 // Defaults are pre-filled into the connect screen; --host/--port/--name override them.
+// Name default is 'Vlad': the server currently rejects 'AaBot' with a Cheater() flag (stale/
+// ghost session), while 'Vlad' registers cleanly — see registration-race notes. Override with
+// --name once 'AaBot' is clear server-side again.
 string host = "192.168.68.61";
 int    port = 4534;
-string name = "AaBot";
+string name = "Vlad";
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -39,6 +42,16 @@ if (System.Array.IndexOf(args, "--selftest") >= 0)
 }
 
 // The client starts DISCONNECTED: the in-app connect screen drives BeginConnect now, so the
+// SFX audition (--audition): boot just the audio device and play every manifest sound in
+// sequence, naming each on the console, then exit. No server, no full UI — the quickest way to
+// hear the whole pack, including cues (countdown/wall_grind) that need specific in-game triggers.
+if (System.Array.IndexOf(args, "--audition") >= 0)
+{
+    using var audition = new AuditionGame();
+    audition.Run();
+    return;
+}
+
 // window opens immediately at the connect form (no blocking pre-connect). Login, the desc=201
 // registration race, fresh-socket retry and the session loop all live inside UiArmaClient.
 var client = new UiArmaClient();

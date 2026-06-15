@@ -487,5 +487,115 @@ namespace Armagetron.Protocol.Tests.Game
             p.OnBack();
             Assert.True(p.ShowsGameplay); // paused still shows frozen gameplay
         }
+
+        // ── SFX cues (host drains Sfx each frame and plays them) ────────────────────
+
+        [Fact]
+        public void Connect_Success_PushesConnectOk_Failure_PushesConnectFail()
+        {
+            var ok = new FakeUiClient();
+            var s = Shell(ok);
+            s.HandleTap(Layouts.Connect(W, H).Connect.CenterX, Layouts.Connect(W, H).Connect.CenterY, W, H);
+            ok.Status = ConnectionStatus.Connected;
+            s.Tick(Array.Empty<CycleSnapshot>(), 0);
+            Assert.Contains(SfxId.ConnectOk, s.Sfx.Drain());
+
+            var bad = new FakeUiClient();
+            var f = Shell(bad);
+            f.HandleTap(Layouts.Connect(W, H).Connect.CenterX, Layouts.Connect(W, H).Connect.CenterY, W, H);
+            bad.Status = ConnectionStatus.Failed;
+            f.Tick(Array.Empty<CycleSnapshot>(), 0);
+            Assert.Contains(SfxId.ConnectFail, f.Sfx.Drain());
+        }
+
+        [Fact]
+        public void TappingConnectButton_PushesUiTap()
+        {
+            var c = new FakeUiClient();
+            var s = Shell(c);
+            s.HandleTap(Layouts.Connect(W, H).Connect.CenterX, Layouts.Connect(W, H).Connect.CenterY, W, H);
+            Assert.Contains(SfxId.UiTap, s.Sfx.Drain());
+        }
+
+        [Fact]
+        public void OnTurn_WhilePlaying_PushesTurn()
+        {
+            var c = new FakeUiClient();
+            var s = Playing(c);
+            s.Sfx.Drain();                          // clear connect/ui cues from setup
+            s.OnTurn(TurnDirection.Left);
+            Assert.Contains(SfxId.Turn, s.Sfx.Drain());
+        }
+
+        [Fact]
+        public void TouchTapTurn_PushesTurn()
+        {
+            var c = new FakeUiClient();
+            var s = Playing(c, touch: true);
+            s.Sfx.Drain();
+            s.HandleTap(10, H / 2, W, H);
+            Assert.Contains(SfxId.Turn, s.Sfx.Drain());
+        }
+
+        [Fact]
+        public void LocalDiedEvent_PushesExplosion()
+        {
+            var c = new FakeUiClient();
+            var s = Playing(c);
+            s.Sfx.Drain();
+            c.Events.Enqueue(MatchEvent.LocalDied);
+            s.Tick(Array.Empty<CycleSnapshot>(), 100);
+            Assert.Contains(SfxId.Explosion, s.Sfx.Drain());
+        }
+
+        [Fact]
+        public void RoundStartEvent_PushesGo()
+        {
+            var c = new FakeUiClient();
+            var s = Playing(c);
+            s.Sfx.Drain();
+            c.Events.Enqueue(MatchEvent.RoundStart);
+            s.Tick(Array.Empty<CycleSnapshot>(), 100);
+            Assert.Contains(SfxId.Go, s.Sfx.Drain());
+        }
+
+        [Fact]
+        public void RoundEnd_PushesWin_WhenAlive_AndLose_AfterDeath()
+        {
+            var alive = new FakeUiClient();
+            var w = Playing(alive);
+            w.Sfx.Drain();
+            alive.Events.Enqueue(MatchEvent.RoundEnd);
+            w.Tick(Array.Empty<CycleSnapshot>(), 100);
+            var won = w.Sfx.Drain();
+            Assert.Contains(SfxId.Win, won);
+            Assert.DoesNotContain(SfxId.Lose, won);
+
+            var dead = new FakeUiClient();
+            var l = Playing(dead);
+            dead.Events.Enqueue(MatchEvent.LocalDied);
+            l.Tick(Array.Empty<CycleSnapshot>(), 100);
+            l.Sfx.Drain();
+            dead.Events.Enqueue(MatchEvent.RoundEnd);
+            l.Tick(Array.Empty<CycleSnapshot>(), 200);
+            var lost = l.Sfx.Drain();
+            Assert.Contains(SfxId.Lose, lost);
+            Assert.DoesNotContain(SfxId.Win, lost);
+        }
+
+        [Fact]
+        public void EngineRunning_TrueWhilePlayingAndAlive_FalseOtherwise()
+        {
+            var c = new FakeUiClient();
+            var s = Shell(c);
+            Assert.False(s.EngineRunning);          // on the connect screen
+
+            var p = Playing(c);
+            Assert.True(p.EngineRunning);            // alive in a match
+
+            c.Events.Enqueue(MatchEvent.LocalDied);
+            p.Tick(Array.Empty<CycleSnapshot>(), 100);
+            Assert.False(p.EngineRunning);           // engine cuts when the local cycle dies
+        }
     }
 }
