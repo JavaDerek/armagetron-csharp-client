@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Headless verification of the browser data path: drives WebArmaClient (WebSocket transport)
+       through the relay to a live server, exactly as the Blazor client will, but from a terminal —
+       so the whole tunnel (codec + session + WS link + relay + UDP) is provable without a browser.
+       The only thing it does NOT cover is the in-page canvas paint + WASM threading. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Armagetron.Web.Probe</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Web.Shared\Web.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

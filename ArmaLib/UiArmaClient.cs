@@ -19,14 +19,23 @@ namespace Armagetron.Lib
     [ExcludeFromCodeCoverage]
     public sealed class UiArmaClient : IUiClient, IDisposable
     {
-        private readonly ArmaClient _client = new ArmaClient();
+        private readonly ArmaClient _client;
         private readonly object _gate = new object();
         private readonly Queue<MatchEvent> _events = new Queue<MatchEvent>();
         private volatile int _status = (int)ConnectionStatus.Idle;
         private Thread? _connectThread;
 
-        public UiArmaClient()
+        /// <summary>Default: a normal UDP-socket client (desktop / Android / iOS).</summary>
+        public UiArmaClient() : this(new ArmaClient()) { }
+
+        /// <summary>
+        /// Inject a specific <see cref="ArmaClient"/> — used by the web head to supply a
+        /// <c>WebArmaClient</c> whose transport is WebSocket→relay→UDP, since browsers cannot open
+        /// raw UDP sockets. The shell/UI is unaware of the difference.
+        /// </summary>
+        public UiArmaClient(ArmaClient client)
         {
+            _client = client;
             _client.RoundStarted += (_, _) => Enqueue(MatchEvent.RoundStart);
             _client.RoundEnded   += (_, _) => Enqueue(MatchEvent.RoundEnd);
             _client.Died         += (_, e) => { if (e.IsMine) Enqueue(MatchEvent.LocalDied); };

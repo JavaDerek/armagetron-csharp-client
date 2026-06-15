@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The browser transport for Armagetron. netstandard2.1 so it is consumed unchanged by both
+       the Blazor WASM client (net9.0 browser) and a desktop console test (net9.0). The whole point
+       is the IUdpLink seam: browsers cannot open raw UDP sockets, so the link tunnels datagrams
+       over a WebSocket to a relay that speaks UDP to the game server (see Web/WsRelay). -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9</LangVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\ArmaLib\ArmaLib.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- WebSocket <-> UDP relay. Browsers can't open raw UDP sockets, so the web client tunnels the
+       game's datagrams over a WebSocket to this relay, which forwards them to the real server's UDP
+       port (and pumps replies back). One WS connection == one dedicated UDP socket to the server,
+       so multiple browser players are isolated. Kestrel makes the WebSocket server cross-platform
+       (macOS/Linux/Windows), unlike HttpListener's WS accept. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Armagetron.Web.Relay</RootNamespace>
+  </PropertyGroup>
+
+</Project>
