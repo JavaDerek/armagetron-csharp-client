@@ -109,10 +109,16 @@ before App Store / Quest Store distribution or any monetization.
 
 ## Target matrix
 
-| Target | Engine | Status |
-|--------|--------|--------|
-| Desktop (Win/macOS/Linux) | MonoGame | planned (after core) |
-| Android | MonoGame | planned |
-| iPhone / iPad | MonoGame | planned (needs Xcode + Apple acct) |
-| Meta Quest VR | Unity | future (first-person VR) |
-| Protocol core | — | **in progress** (this repo) |
+| Target | Engine | Project | Status |
+|--------|--------|---------|--------|
+| Protocol core | — | `Core.Protocol` / `Core.Net` / `ArmaLib` | **done**, live-verified; the shared foundation for every head |
+| Desktop (Win/macOS/Linux) | MonoGame | `Game.Desktop` | **done & live-verified**; 2D top-down + 3D third/first-person camera (`C` toggles) |
+| Android | MonoGame | `Game.Android` | **done & live-verified** on emulator (touch, audio, assets) |
+| iPhone / iPad | MonoGame | `Game.iOS` | **scaffold** (mirrors Android 1:1); needs Xcode + `dotnet workload install ios` to build |
+| Meta Quest VR | Unity / OpenXR | `Game.Oculus` | **scaffold**; reuses `Scene3DBuilder`/`Camera3D`; needs the Unity Editor to build |
+| Web — server-rendered | C# + `<canvas>` | `Web/Web.Host` | **works & live-verified** (streams the Scene over WS; runs in any browser) |
+| Web — pure in-browser | Blazor WASM | `Web/Web.Shared` + `Web/WsRelay` | **foundation done & live-verified** (WebSocket↔UDP transport); Blazor page pending WASM threads |
+
+All heads share `ArmaLib` + the pure render/camera model; only the bottom transport edge and the
+input/asset edges differ per platform. See `Web/README.md`, `Game.iOS/README.md`,
+`Game.Oculus/README.md` for the per-head build/finish steps.
