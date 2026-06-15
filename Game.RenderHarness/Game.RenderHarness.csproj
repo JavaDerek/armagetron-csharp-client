@@ -15,6 +15,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Core.Protocol\Core.Protocol.csproj" />
+    <!-- ArmaLib lets the harness optionally connect to a LIVE server (the "live-*" scenarios)
+         and render a real snapshot, so the 3D views can be verified against actual server
+         geometry, not just the scripted demo world. -->
+    <ProjectReference Include="..\ArmaLib\ArmaLib.csproj" />
   </ItemGroup>
 
   <Import Project="..\Game.Shared\RenderingCode.props" />

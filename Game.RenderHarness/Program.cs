@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using Armagetron.Game;
 using Armagetron.Game.Rendering;
 using Armagetron.Game.UI;
+using Armagetron.Lib;
 using Armagetron.Protocol;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -39,9 +42,79 @@ namespace Armagetron.Game.RenderHarness
                 return File.Exists(outPath) ? 0 : 1;
             }
 
+            // LIVE scenarios: actually connect to a running server, capture a real snapshot, and
+            // render it — the headless live-server verification of the 3D views (CLAUDE.md step 4).
+            //   live-3d-third | live-3d-first | live-2d   [out.png] [host] [port] [name]
+            if (scenario.StartsWith("live", StringComparison.Ordinal))
+            {
+                string host = args.Length > 2 ? args[2] : "192.168.68.61";
+                int port = args.Length > 3 ? int.Parse(args[3]) : 4534;
+                string name = args.Length > 4 ? args[4] : "Vlad";
+
+                (CycleSnapshot[] snap, int myId) = CaptureLive(host, port, name);
+                Console.Error.WriteLine($"[live] captured {snap.Length} cycles (myId={myId})");
+
+                if (scenario == "live-2d")
+                {
+                    int side = Math.Min(W, H);
+                    var view = new ArenaView(176.78f, 10f, side);
+                    Scene s2d = SceneBuilder.BuildWithArt(snap, myId, view, new CyclePalette(), 8);
+                    using var live2d = new HarnessGame(
+                        new List<Layer> { new Layer(s2d, (W - side) / 2, (H - side) / 2) }, W, H, outPath);
+                    live2d.Run();
+                }
+                else
+                {
+                    const float arena = 176.78f, wall = 8f;
+                    Vec2 pos = new Vec2(arena / 2f, arena / 2f), dir = new Vec2(1, 0);
+                    foreach (CycleSnapshot c in snap)
+                        if (c.CycleId == myId) { pos = c.Position; dir = c.Direction; }
+                    var cam = new CameraController(CameraSettings.Default);
+                    cam.SetMode(scenario == "live-3d-first" ? CameraMode.FirstPerson : CameraMode.ThirdPerson);
+                    WorldScene world = Scene3DBuilder.Build(snap, myId, new CyclePalette(), arena, wall);
+                    using var live3d = new HarnessGame(new List<Layer>(), W, H, outPath, world, cam.Pose(pos, dir));
+                    live3d.Run();
+                }
+                return File.Exists(outPath) ? 0 : 1;
+            }
+
             using var game = new HarnessGame(BuildLayers(scenario), W, H, outPath);
             game.Run();
             return File.Exists(outPath) ? 0 : 1;
+        }
+
+        // Connect to a live server, wait until joined, then sample snapshots for a few seconds and
+        // return the richest one (most cycles, local cycle preferred) so the render has real
+        // geometry. Falls back to whatever we have on timeout. Name 'Vlad' clears the cheat gate.
+        private static (CycleSnapshot[] snap, int myId) CaptureLive(string host, int port, string name)
+        {
+            using var client = new UiArmaClient();
+            Console.Error.WriteLine($"[live] BeginConnect {host}:{port} as '{name}'");
+            client.BeginConnect(host, port, name);
+
+            var sw = Stopwatch.StartNew();
+            while (client.Status == ConnectionStatus.Connecting && sw.Elapsed.TotalSeconds < 55)
+                Thread.Sleep(100);
+            Console.Error.WriteLine($"[live] Status={client.Status} MyCycleId={client.MyCycleId}");
+
+            CycleSnapshot[] best = Array.Empty<CycleSnapshot>();
+            if (client.Status == ConnectionStatus.Connected)
+            {
+                // Sample for ~8s; keep the snapshot with the most cycles (prefer one containing ours).
+                var sampleSw = Stopwatch.StartNew();
+                while (sampleSw.Elapsed.TotalSeconds < 8)
+                {
+                    CycleSnapshot[] s = client.Snapshot();
+                    bool hasMine = Array.Exists(s, c => c.CycleId == client.MyCycleId);
+                    bool bestHasMine = Array.Exists(best, c => c.CycleId == client.MyCycleId);
+                    if (s.Length > best.Length || (hasMine && !bestHasMine))
+                        best = s;
+                    Thread.Sleep(120);
+                }
+            }
+            int myId = client.MyCycleId;
+            client.Disconnect();
+            return (best, myId);
         }
 
         // Build the demo world plus a camera pose for the requested 3D view.
