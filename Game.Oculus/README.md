@@ -44,8 +44,13 @@ Then in the Editor:
 
 `ArmagetronRunner` (one MonoBehaviour) is the entire head:
 - Connects via `UiArmaClient` — **identical** to desktop/Android/iOS.
-- Each frame calls the engine-neutral `Scene3DBuilder.Build(...)` → `WorldScene`, then
-  `WallMeshBuilder` uploads the wall quads to one Unity mesh and a pooled cube is placed per cycle.
+- Each frame calls the engine-neutral `Scene3DBuilder.Build(...)` → `WorldScene`, then the
+  engine-neutral, unit-tested `WallMesh.From(world)` tessellates the quads (vertex order, triangle
+  winding, per-vertex colour, 16-/32-bit index decision) and `WallMeshBuilder` just copies those
+  arrays into one Unity mesh via `VrConvert`; a pooled cube is placed per cycle.
+- Because the head connects through the shared `UiArmaClient`, it inherits the spectator-join
+  behaviour: it reaches `Connected` and renders the live arena a second or two after login (our own
+  cycle appears at the next round), instead of blocking on spawn.
 - The VR camera is **rig placement only** (the HMD owns head rotation):
   - **First-person:** rig anchored at the cycle head (`CameraSettings.EyeHeight`).
   - **Third-person:** rig placed at the chase eye from `Camera3D` (same math as the desktop 3D view).
@@ -72,6 +77,28 @@ rule 4 keeps those out of the core. World space already matches Unity (Y-up), so
    instead of hard-coded fields.
 8. **Live-server gate** (CLAUDE.md step 4): register + render + steer against a real `0.2.9.3.0`
    server from the headset.
+
+## Reviewed findings (2026-06-15, by inspection — no Editor available)
+
+Code review of `ArmagetronRunner` against the ArmaLib API while extracting `WallMesh`. None block
+opening the project; fix as part of the porting plan above. Ordered roughly by impact:
+
+- **Per-cycle material instancing leak.** `SyncCycles` sets `r.material.color` each frame, which
+  instantiates a material clone per pooled cube and never destroys them on teardown. Use a
+  `MaterialPropertyBlock` (`r.SetPropertyBlock`) to tint without instancing — the idiomatic, GC-free
+  Quest approach — or cache the instanced material and `Destroy` it in `OnDestroy`.
+- **Wall mesh + arrays rebuilt every frame.** `WallMesh.From(...)` allocates fresh vertex/index/
+  colour arrays each `Update`; on a mobile Quest GPU that is avoidable GC churn. Consider rebuilding
+  only when the wall set changes, or reusing buffers (`Mesh.SetVertices(List<>)`).
+- **Third-person forces `XrOrigin.rotation`.** Rotating the XR tracking space (not just a camera)
+  yaws the player's whole world and is a known comfort/nausea hazard in VR. Prefer rotating a camera
+  pivot *inside* a fixed origin, or leave yaw to the HMD — folds into the comfort work (item 2).
+- **First-person rig omits `NoseOffset`.** `PositionRig` FP places the eye at `(pos, EyeHeight)`
+  with no forward nudge, unlike `Camera3D.Compute` FP (which adds `forward * NoseOffset` to clear the
+  player's own wall). Reuse `Camera3D` for the FP eye too, for parity with the desktop 3D view.
+- **`ArenaSize`/`WallHeight` hardcoded.** Same root issue as every head — see
+  the arena-bounds note: the real arena size should come from `desc=51`, not the `176.78` default,
+  or the floor quad and walls mis-scale on bigger maps.
 
 ## Notes
 
