@@ -69,15 +69,17 @@ namespace Armagetron.Lib
         /// <summary>
         /// Connect to <paramref name="host"/>:<paramref name="port"/> as
         /// <paramref name="name"/>, complete the login + registration handshake, and start
-        /// the background session loop. Returns true once our cycle exists and the game is
-        /// joinable; false if registration could not be completed.
+        /// the background session loop. Returns true once the session is JOINABLE — registered
+        /// and the live arena is streaming — even if our own cycle has not spawned yet; false
+        /// if registration could not be completed.
         ///
-        /// Registration (desc=201) is a one-shot, timing-sensitive race against the server.
-        /// It is driven here on the CALLER's (uncontended) thread before the loop thread
-        /// starts — a render-starved thread loses the race and the server replies "cheating".
-        /// On timeout/rejection we retry on a FRESH socket, which also escapes the server's
-        /// post-rejection mute. Once registered, the session is handed to a background thread
-        /// for the gameplay phase.
+        /// Registration (desc=201) is driven here on the CALLER's (uncontended) thread before
+        /// the loop thread starts. On timeout/rejection we retry on a FRESH socket, which also
+        /// escapes the server's post-rejection mute. Crucially we return at "joinable" rather
+        /// than blocking until our cycle spawns: on a mid-round join the server defers our spawn
+        /// to the next round (~10s+), so the front-end can render the live arena as a spectator
+        /// meanwhile instead of sitting on a "Connecting" screen. The remaining wait-for-spawn
+        /// happens on the background loop, where <see cref="MyCycleId"/> flips on creation.
         /// </summary>
         public bool Connect(string host, int port, string name,
                             int timeoutMs = 45_000, int maxAttempts = 10)
@@ -88,7 +90,7 @@ namespace Armagetron.Lib
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 var candidate = new ArmaSession(CreateLink(host, port), name, _world, _events);
-                if (candidate.RunUntilPlaying(timeoutMs))
+                if (candidate.RunUntilJoinable(timeoutMs))
                 {
                     _session = candidate;
                     StartLoop();

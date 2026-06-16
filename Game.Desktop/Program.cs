@@ -41,6 +41,43 @@ if (System.Array.IndexOf(args, "--selftest") >= 0)
     return;
 }
 
+// Headless blank-frame check (--blankcheck): the live verification for the round-reset blanking
+// bug (render_blank_and_registration_bugs). Connect, then poll Snapshot() at render cadence for
+// ~20s — long enough to span several round resets in a fast arena — and count how many frames
+// were EMPTY *after* the first cycle appeared. With the deferred (sample-and-hold) ClearRound a
+// continuous renderer must never blank mid-stream: the post-first-cycle blank count must be 0.
+if (System.Array.IndexOf(args, "--blankcheck") >= 0)
+{
+    using var probe = new UiArmaClient();
+    System.Console.WriteLine($"[blankcheck] BeginConnect {host}:{port} as '{name}'");
+    probe.BeginConnect(host, port, name);
+    var sw = System.Diagnostics.Stopwatch.StartNew();
+    while (probe.Status == ConnectionStatus.Connecting && sw.Elapsed.TotalSeconds < 50)
+        System.Threading.Thread.Sleep(100);
+    System.Console.WriteLine($"[blankcheck] Status={probe.Status} MyCycleId={probe.MyCycleId}");
+
+    int samples = 0, maxCycles = 0, blanksBeforeFirst = 0, blanksAfterFirst = 0;
+    bool seenAny = false;
+    var sampleSw = System.Diagnostics.Stopwatch.StartNew();
+    while (sampleSw.Elapsed.TotalSeconds < 20 && probe.Status == ConnectionStatus.Connected)
+    {
+        int n = probe.Snapshot().Length;
+        samples++;
+        if (n > maxCycles) maxCycles = n;
+        if (n == 0) { if (seenAny) blanksAfterFirst++; else blanksBeforeFirst++; }
+        else        seenAny = true;
+        System.Threading.Thread.Sleep(16); // ~60fps render cadence
+    }
+    System.Console.WriteLine(
+        $"[blankcheck] samples={samples} maxCycles={maxCycles} " +
+        $"blanksBeforeFirstCycle={blanksBeforeFirst} blanksAfterFirstCycle={blanksAfterFirst}");
+    System.Console.WriteLine(blanksAfterFirst == 0 && maxCycles > 0
+        ? "[blankcheck] PASS — never blanked once cycles were live (sample-and-hold through resets)"
+        : "[blankcheck] FAIL — view blanked mid-stream or no cycles ever appeared");
+    probe.Disconnect();
+    return;
+}
+
 // The client starts DISCONNECTED: the in-app connect screen drives BeginConnect now, so the
 // SFX audition (--audition): boot just the audio device and play every manifest sound in
 // sequence, naming each on the console, then exit. No server, no full UI — the quickest way to

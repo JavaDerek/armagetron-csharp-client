@@ -24,6 +24,14 @@ namespace Armagetron.Game
         private readonly object _lock = new object();
         private readonly Dictionary<int, MutableCycleState> _cycles = new Dictionary<int, MutableCycleState>();
 
+        // Round transitions are a DEFERRED clear, not an immediate one. ClearRound() only
+        // arms this flag; the cycles are dropped lazily on the next write (the new round's
+        // first sync). Between the two, Snapshot() keeps returning the last round's frame
+        // (sample-and-hold) so a continuous renderer never blanks at a round boundary —
+        // yet the prior round's trails are still flushed before the new round draws, so no
+        // stale trail bleeds across (the bug ClearRound exists to prevent).
+        private bool _clearPending;
+
         public int MyCycleId { get; private set; } = -1;
 
         // Fallback remote speed (units/sec) used only until a sync reports the cycle's
@@ -55,9 +63,27 @@ namespace Armagetron.Game
             lock (_lock) { MyCycleId = id; }
         }
 
+        /// <summary>
+        /// Arm a deferred end-of-round clear. The world is NOT emptied now — the current
+        /// frame is held until the next round's first cycle write (<see cref="ApplyPendingClear"/>),
+        /// so a continuous renderer keeps drawing the last frame instead of blanking in the
+        /// gap before the new round's syncs arrive.
+        /// </summary>
         public void ClearRound()
         {
-            lock (_lock) { _cycles.Clear(); }
+            lock (_lock) { _clearPending = true; }
+        }
+
+        // Flush a pending end-of-round clear. Called at the start of every cycle write (all
+        // under _lock): the first write of the new round drops the prior round's cycles so
+        // their trails don't bleed in, then the write proceeds to seed the fresh round.
+        private void ApplyPendingClear()
+        {
+            if (_clearPending)
+            {
+                _cycles.Clear();
+                _clearPending = false;
+            }
         }
 
         /// <summary>
@@ -139,6 +165,7 @@ namespace Armagetron.Game
         {
             lock (_lock)
             {
+                ApplyPendingClear();
                 if (!_cycles.TryGetValue(cycleId, out var c))
                 {
                     c = new MutableCycleState();
@@ -212,6 +239,7 @@ namespace Armagetron.Game
 
         private MutableCycleState GetOrCreate(int cycleId, Vec2 seed)
         {
+            ApplyPendingClear();
             if (!_cycles.TryGetValue(cycleId, out var c))
             {
                 c = new MutableCycleState();

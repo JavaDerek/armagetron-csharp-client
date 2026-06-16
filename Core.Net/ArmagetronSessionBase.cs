@@ -75,6 +75,14 @@ namespace Armagetron.Net
         private int  _myPlayerNetObjId     = -1;
 
         private long _registrationArmTick  = 0;     // earliest tick to begin priming after login
+        private long _registrationSentTick = 0;     // tick desc=201 went out; gates the join grace
+        private bool _sawWorldSync         = false; // a 27w position sync decoded → the arena has content
+
+        // After desc=201 is sent we keep pumping on the CALLER's thread for this long before
+        // declaring the session joinable, so the registration's initial acks/retransmits go out
+        // on the uncontended thread (preserving the desc=201 timing) before the background loop
+        // takes over. Short enough that joining no longer waits a whole round for our own spawn.
+        private const int JoinGraceMs = 750;
 
         // netObject ID reservation pool (desc=20 reply → desc=201 allocation)
         private readonly SortedSet<int> _reservedIds = new SortedSet<int>();
@@ -140,26 +148,45 @@ namespace Armagetron.Net
         }
 
         /// <summary>
-        /// Drive the connect→login→register handshake on the CALLER's thread until our
-        /// cycle is created (State.Playing) or <paramref name="timeoutMs"/> elapses.
-        /// Registration is a one-shot, timing-sensitive race against the server; running
-        /// it on an uncontended thread (not a render-starved background thread) is what
-        /// makes desc=201 land inside the server's valid window. Returns true on success.
+        /// Drive the connect→login→register handshake on the CALLER's thread until the session
+        /// is JOINABLE — either our cycle has spawned (State.Playing) or we are registered and
+        /// the live arena is already streaming (so the front-end can render it as a spectator
+        /// while awaiting our spawn) — or <paramref name="timeoutMs"/> elapses.
+        ///
+        /// Returning at "joinable" rather than waiting for our own cycle is the fix for clients
+        /// sitting in "Connecting" for a whole round: on a mid-round join the server only spawns
+        /// our cycle at the NEXT round boundary (≈10s+), yet registration already succeeded and
+        /// the arena is live the entire time. Registration itself (the desc=201 send + its grace
+        /// window) still runs here on the uncontended caller thread, preserving its timing; only
+        /// the subsequent wait-for-spawn is moved to the background loop. Returns true if joinable.
         /// </summary>
-        public bool RunUntilPlaying(int timeoutMs)
+        public bool RunUntilJoinable(int timeoutMs)
         {
             SendPoll();
             long deadline = Tick() + timeoutMs;
-            while (!_stopRequested && _state != State.Playing
+            while (!_stopRequested && !IsJoinable
                    && !_registrationRejected && Tick() < deadline)
                 Pump();
-            return _state == State.Playing;
+            return IsJoinable;
         }
 
         /// <summary>
+        /// True once the session is worth handing to the render loop: our cycle exists
+        /// (State.Playing), OR registration has been submitted (desc=201 sent), the arena is
+        /// already producing position syncs, and the post-registration grace has elapsed so the
+        /// desc=201 acks went out on the caller thread. The grace+sync gate keeps us from
+        /// flipping to a blank spectator view, and an empty server (no syncs until our own spawn)
+        /// simply falls back to waiting for State.Playing.
+        /// </summary>
+        private bool IsJoinable =>
+            _state == State.Playing
+            || (_playerObjectSent && _sawWorldSync && _registrationSentTick != 0
+                && Tick() - _registrationSentTick >= JoinGraceMs);
+
+        /// <summary>
         /// Continue pumping the session loop WITHOUT re-sending the initial poll — used to
-        /// hand a session already advanced by <see cref="RunUntilPlaying"/> off to a
-        /// background thread for the rendering phase.
+        /// hand a session already advanced by <see cref="RunUntilJoinable"/> off to a
+        /// background thread for the rendering phase (where our cycle finally spawns).
         /// </summary>
         public void RunLoop()
         {
@@ -347,6 +374,7 @@ namespace Armagetron.Net
             }
             else if (CycleStateSync.TryDecodeFull(msg, out var sync))
             {
+                _sawWorldSync = true; // arena has live content — enough to render as a spectator
                 bool ours = sync.CycleId == _myCycleId && _myCycleId >= 0;
                 Log($"  desc=24 27w cid={sync.CycleId}{(ours ? " ★OUR" : "")} " +
                     $"pos=({sync.Position.X:0.##},{sync.Position.Y:0.##}) " +
@@ -543,8 +571,9 @@ namespace Armagetron.Net
                 Log($"  → priming done — desc=201+204 (reserved netobj={reserved})");
                 _myPlayerNetObjId = reserved;
                 SendPlayerObjectCreate();
-                _playerObjectSent = true;
-                _speedSyncStep    = -1;
+                _playerObjectSent    = true;
+                _registrationSentTick = Tick(); // start the join-grace clock
+                _speedSyncStep       = -1;
             }
         }
 

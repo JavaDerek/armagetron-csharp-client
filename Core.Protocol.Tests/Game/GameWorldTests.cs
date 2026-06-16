@@ -274,15 +274,57 @@ namespace Armagetron.Protocol.Tests.Game
         }
 
         [Fact]
-        public void ClearRound_RemovesAllCycles()
+        public void ClearRound_IsDeferred_SnapshotHoldsLastFrameUntilNextWrite()
         {
+            // BUG 1 regression: a continuous 30fps renderer must not blank between rounds.
+            // ClearRound used to empty the world immediately, so any Snapshot taken in the
+            // gap between the clear and the next round's first sync rendered an EMPTY arena
+            // (the live "view blanks on every round reset"). The clear is now deferred:
+            // the last non-empty frame is held (sample-and-hold) until new data arrives.
             var w = NewWorldOwning(5);
             w.MoveLocalCycle(5, new Vec2(1, 1), new Vec2(1, 0));
             w.UpdateRemoteCycle(9, new Vec2(2, 2), new Vec2(0, 1));
             Assert.Equal(2, w.Snapshot().Length);
 
             w.ClearRound();
-            Assert.Empty(w.Snapshot());
+            // Sample-and-hold: the previous round's frame is still rendered, not blanked.
+            Assert.Equal(2, w.Snapshot().Length);
+        }
+
+        [Fact]
+        public void ClearRound_FirstWriteOfNextRound_DropsStaleCycles()
+        {
+            var w = NewWorldOwning(5);
+            w.MoveLocalCycle(5, new Vec2(1, 1), new Vec2(1, 0));
+            w.UpdateRemoteCycle(9, new Vec2(2, 2), new Vec2(0, 1));
+
+            w.ClearRound();
+            // The next round's first sync flushes the held frame, leaving ONLY new cycles.
+            w.UpdateRemoteCycle(11, new Vec2(5, 5), new Vec2(1, 0));
+
+            var snap = w.Snapshot();
+            Assert.Single(snap);
+            Assert.Equal(11, snap[0].CycleId);
+        }
+
+        [Fact]
+        public void ClearRound_ReusedCycleId_StartsFreshTrail_NoStaleBleed()
+        {
+            // A cycle id reused across rounds must NOT append the new round's spawn to the
+            // old round's trail — that's the garbled-trail bleed the clear exists to prevent
+            // (see [[tried_and_failed]]). The deferred clear still flushes before the write.
+            var w = NewWorldOwning(5);
+            w.UpdateRemoteCycle(9, new Vec2(0, 0), new Vec2(1, 0));
+            w.UpdateRemoteCycle(9, new Vec2(30, 0), new Vec2(1, 0));
+
+            w.ClearRound();
+            w.UpdateRemoteCycle(9, new Vec2(80, 80), new Vec2(0, 1)); // new round spawn, same id
+
+            var snap = SnapOf(w, 9);
+            // Trail is just the fresh spawn — no (0,0)/(30,0) corner from the prior round.
+            Assert.Single(snap.Trail);
+            Assert.Equal(new Vec2(80, 80), snap.Trail[0]);
+            Assert.Equal(new Vec2(80, 80), snap.Position);
         }
 
         [Fact]
