@@ -14,9 +14,45 @@
     <AssemblyName>Armagetron.Lib</AssemblyName>
   </PropertyGroup>
 
+  <!-- NuGet package metadata. ArmaLib ships as a self-contained package: its Core.Protocol
+       and Core.Net dependencies are ProjectReferences (PrivateAssets=all below) whose DLLs are
+       bundled into this package by the CopyProjectReferencesToPackage target, so consumers
+       `dotnet add package DotNetDevotee.ArmaLib.Lib` and get everything with no extra packages. -->
+  <PropertyGroup>
+    <PackageId>DotNetDevotee.ArmaLib.Lib</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Derek Ferguson</Authors>
+    <Company>DotNetDevotee</Company>
+    <Description>A beginner-friendly C# SDK for connecting to Armagetron Advanced 0.2.9.x game servers: join a game, steer a lightcycle, and read the world through one ArmaClient facade. Engine-agnostic (netstandard2.1); the UDP wire protocol stays hidden. Self-contained — bundles its Core.Protocol and Core.Net dependencies.</Description>
+    <PackageTags>armagetron;armagetronad;tron;lightcycle;game;udp;netstandard;sdk</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://gitlab.com/JavaDerek/armagetron-csharp-client</PackageProjectUrl>
+    <RepositoryUrl>https://gitlab.com/JavaDerek/armagetron-csharp-client.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <Copyright>Copyright (c) 2026 Derek Ferguson (DotNetDevotee)</Copyright>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <!-- Bundle the ProjectReference DLLs into this package's lib folder (see target below). -->
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\Core.Protocol\Core.Protocol.csproj" />
-    <ProjectReference Include="..\Core.Net\Core.Net.csproj" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- PrivateAssets=all: don't surface Core.* as NuGet *dependencies* of the package; their
+         DLLs are instead embedded into lib/ by CopyProjectReferencesToPackage. -->
+    <ProjectReference Include="..\Core.Protocol\Core.Protocol.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\Core.Net\Core.Net.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Add the (copy-local) ProjectReference output assemblies to the package's build output, so the
+       single .nupkg carries Armagetron.Lib.dll + Armagetron.Protocol.dll + Armagetron.Net.dll. -->
+  <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths->WithMetadataValue('ReferenceSourceTarget', 'ProjectReference'))" />
+    </ItemGroup>
+  </Target>
 
 </Project>
