@@ -1,0 +1,39 @@
+name: CI
+
+# Keeps main green: build + full xUnit suite + the hard 90% line-coverage gate on every push and
+# pull request. Scoped to the workload-free projects so it runs on a stock runner — the Android
+# head (net9.0-android) needs the android workload + SDK and is validated locally instead.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '9.0.x'
+
+      # Builds Core.Protocol + Core.Net + ArmaLib (the published package's sources) and runs the
+      # suite with the coverlet 90% gate baked into Core.Protocol.Tests.csproj. -warnaserror mirrors
+      # the local build-and-test.sh.
+      - name: Test + 90% coverage gate
+        run: dotnet test Core.Protocol.Tests/Core.Protocol.Tests.csproj -c Debug -warnaserror
+
+      # Compile a MonoGame head so the shared GPU/render glue (Scene3DRenderer, ModelStore,
+      # SceneRenderer, ArmagetronGame) stays building — it isn't covered by the unit tests.
+      - name: Build MonoGame head (guards shared rendering code)
+        run: dotnet build Game.RenderHarness/Game.RenderHarness.csproj -c Debug -warnaserror
