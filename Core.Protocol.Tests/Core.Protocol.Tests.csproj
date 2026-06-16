@@ -34,6 +34,13 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- The .glb model parser is MonoGame-free (System.Text.Json + System.Numerics + the neutral
+       core types), so compile-link it here to unit-test the parsing without pulling in MonoGame.
+       It also ships into the heads via Game.Shared/RenderingCode.props. -->
+  <ItemGroup>
+    <Compile Include="..\Game.Shared\Rendering\GlbModelLoader.cs" Link="Shared\GlbModelLoader.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Core.Protocol\Core.Protocol.csproj" />
     <ProjectReference Include="..\Core.Net\Core.Net.csproj" />

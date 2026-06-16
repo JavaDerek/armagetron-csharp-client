@@ -52,6 +52,11 @@ incremental — the client renders fine without any of it.
   point. If you'd rather, a small **3D particle burst spec** (count, colours, lifetime) is welcome,
   but the sprite sheet is sufficient.
 
+### 6. Arena perimeter wall
+The tall boundary wall (currently a thin rail). A tileable wall texture (256×256, repeats
+horizontally) + an optional logo/decal strip, dark-industrial to contrast the neon trails. Height
+~2–3× the trail-wall height.
+
 ## Camera reference (so model scale/feel matches)
 
 - **Third-person chase:** floats behind + above the cycle, orbit-able with the mouse (right-drag),

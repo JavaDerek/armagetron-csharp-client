@@ -7,5 +7,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Rendering\TextRenderer.cs" Link="Shared\Rendering\TextRenderer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Rendering\SceneRenderer.cs" Link="Shared\Rendering\SceneRenderer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Rendering\Scene3DRenderer.cs" Link="Shared\Rendering\Scene3DRenderer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Rendering\GlbModelLoader.cs" Link="Shared\Rendering\GlbModelLoader.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Rendering\ModelStore.cs" Link="Shared\Rendering\ModelStore.cs" />
   </ItemGroup>
 </Project>

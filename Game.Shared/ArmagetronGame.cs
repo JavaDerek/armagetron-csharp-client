@@ -93,7 +93,7 @@ namespace Armagetron.Game
             _textures = new TextureStore(GraphicsDevice, _mediaRoot);
             _text     = new TextRenderer(_mediaRoot);
             _renderer  = new SceneRenderer(GraphicsDevice, _textures, _text);
-            _renderer3d = new Scene3DRenderer(GraphicsDevice, _textures);
+            _renderer3d = new Scene3DRenderer(GraphicsDevice, _textures, _mediaRoot);
             _music    = new MusicController(_mediaRoot);
             _sfx      = new SfxController(_mediaRoot);
             EnsureView();

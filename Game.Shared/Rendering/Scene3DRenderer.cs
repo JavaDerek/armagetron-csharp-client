@@ -28,6 +28,7 @@ namespace Armagetron.Game.Rendering
 
         private readonly GraphicsDevice _gd;
         private readonly TextureStore _textures;
+        private readonly ModelStore _models;
         private readonly BasicEffect _effect;
 
         private static readonly RasterizerState NoCull = new RasterizerState
@@ -36,10 +37,11 @@ namespace Armagetron.Game.Rendering
             FillMode = FillMode.Solid,
         };
 
-        public Scene3DRenderer(GraphicsDevice gd, TextureStore textures)
+        public Scene3DRenderer(GraphicsDevice gd, TextureStore textures, string? mediaRoot = null)
         {
             _gd = gd;
             _textures = textures;
+            _models = new ModelStore(gd, mediaRoot);
             _effect = new BasicEffect(gd) { LightingEnabled = false };
         }
 
@@ -128,6 +130,11 @@ namespace Armagetron.Game.Rendering
 
         private void DrawCycles(WorldScene world, CameraPose pose)
         {
+            // Prefer the designer's 3D lightcycle model once it's delivered; until then fall back to
+            // the camera-facing billboard so the view always shows cycles.
+            CycleModel? model = _models.Cycle;
+            if (model != null) { DrawCycleModels(world, model); return; }
+
             Texture2D? tex = _textures.Get("ingame/cycle");
             if (tex == null) return;
 
@@ -162,6 +169,34 @@ namespace Armagetron.Game.Rendering
                 _effect.DiffuseColor = new Vector3(c.R / 255f, c.G / 255f, c.B / 255f);
                 ApplyAndDraw(quad);
             }
+            _effect.DiffuseColor = Vector3.One;
+        }
+
+        // Draw the lightcycle model once per cycle: tinted to the player colour (white-master model
+        // modulated by DiffuseColor), placed at the head and yawed to face its heading. The model is
+        // authored nose-+X at identity (DESIGN_BRIEF_3D.md), so the yaw rotates +X onto the heading.
+        private void DrawCycleModels(WorldScene world, CycleModel model)
+        {
+            _gd.SetVertexBuffer(model.Vertices);
+            _gd.Indices = model.Indices;
+            _effect.TextureEnabled = false;
+            _effect.VertexColorEnabled = false;
+
+            foreach (CycleMarker m in world.Cycles)
+            {
+                float yaw = MathF.Atan2(-m.Direction.Y, m.Direction.X); // +X heading → 0
+                _effect.World = Matrix.CreateRotationY(yaw)
+                              * Matrix.CreateTranslation(m.Position.X, 0f, m.Position.Y);
+                Color c = ToXna(m.Color);
+                _effect.DiffuseColor = new Vector3(c.R / 255f, c.G / 255f, c.B / 255f);
+                foreach (EffectPass pass in _effect.CurrentTechnique.Passes)
+                {
+                    pass.Apply();
+                    _gd.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, model.PrimitiveCount);
+                }
+            }
+
+            _effect.World = Matrix.Identity;
             _effect.DiffuseColor = Vector3.One;
         }
 
@@ -200,6 +235,10 @@ namespace Armagetron.Game.Rendering
         private static Vector3 V(Vec3 v) => new Vector3(v.X, v.Y, v.Z);
         private static Color ToXna(RenderColor c) => new Color(c.R, c.G, c.B, c.A);
 
-        public void Dispose() => _effect.Dispose();
+        public void Dispose()
+        {
+            _models.Dispose();
+            _effect.Dispose();
+        }
     }
 }
