@@ -50,4 +50,4 @@ observable connection (UI apps), see `UiArmaClient`.
 ## License
 
 MIT — see the repository.
-Source: https://gitlab.com/JavaDerek/armagetron-csharp-client
+Source: https://github.com/JavaDerek/armagetron-csharp-client

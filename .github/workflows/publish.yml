@@ -1,0 +1,46 @@
+name: Publish ArmaLib to NuGet
+
+# Publishes the DotNetDevotee.ArmaLib package when a version tag (e.g. v0.1.0) is pushed.
+# Uses NuGet Trusted Publishing (OIDC) — no long-lived API key. The package version comes
+# from the tag, so `git tag v0.1.0 && git push origin v0.1.0` cuts a release.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write   # required for NuGet trusted publishing (OIDC token exchange)
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Derive version from tag
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Pack
+        run: dotnet pack ArmaLib/ArmaLib.csproj -c Release -o ./artifacts -p:Version=${{ steps.ver.outputs.version }}
+
+      # Exchanges this workflow's OIDC token for a short-lived NuGet API key via the trusted
+      # publishing policy. `user` must be your nuget.org username (the policy's package owner).
+      - name: NuGet trusted-publishing login
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: DotNetDevotee
+
+      - name: Push to NuGet
+        run: >
+          dotnet nuget push ./artifacts/*.nupkg
+          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate

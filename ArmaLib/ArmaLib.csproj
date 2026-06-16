@@ -27,8 +27,8 @@
     <PackageTags>armagetron;armagetronad;tron;lightcycle;game;udp;netstandard;sdk</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageProjectUrl>https://gitlab.com/JavaDerek/armagetron-csharp-client</PackageProjectUrl>
-    <RepositoryUrl>https://gitlab.com/JavaDerek/armagetron-csharp-client.git</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/JavaDerek/armagetron-csharp-client</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/JavaDerek/armagetron-csharp-client.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <Copyright>Copyright (c) 2026 Derek Ferguson (DotNetDevotee)</Copyright>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
