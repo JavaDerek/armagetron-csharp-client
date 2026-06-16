@@ -30,10 +30,12 @@ dotnet run --project Web/Web.Host          # listens on http://0.0.0.0:8080 (ARM
 # then open: http://localhost:8080/?host=192.168.68.61&port=4534&name=Vlad
 ```
 
-**Verified live** (`--selfcheck`): connected to `192.168.68.61:4534`, streamed **304 frames**,
-`status=Connected`, with 8 wall segments + 4 cycle heads (the four live players) — real geometry
-reaching a browser-style WS client headlessly. The only unverified bit is the in-page canvas paint
-(~80 lines of standard `game.js`); the data + frame path is proven.
+**Verified live** (`--selfcheck`): connected to `192.168.68.61:4534`, reached `status=Connected`
+with 8 wall segments + 3 cycle heads (the live players) — real geometry reaching a browser-style
+WS client headlessly. The session now joins as a **spectator** a second or two after the socket
+opens (it no longer blocks on our own cycle spawn; see the join-at-joinable fix in ArmaLib), so
+the live arena streams immediately and our bike appears at the next round. The only unverified bit
+is the in-page canvas paint (~80 lines of standard `game.js`); the data + frame path is proven.
 
 Open work: the full nine-slice HUD/menus (it currently auto-connects and renders gameplay + a status
 line); designer sprite art on the canvas; the in-app connect form.

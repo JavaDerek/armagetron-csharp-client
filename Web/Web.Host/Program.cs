@@ -136,7 +136,11 @@ static async Task<int> SelfCheck(string baseUrl)
         int rects = doc.RootElement.GetProperty("rects").GetArrayLength();
         maxLines = Math.Max(maxLines, lines);
         maxRects = Math.Max(maxRects, rects);
-        if (maxLines > 4 && maxRects > 0) break; // saw real cycle geometry, not just the arena border
+        // Exit once we've BOTH reached Connected and seen real cycle geometry (not just the
+        // arena border). Gating on Connected matters: the session now joins as a spectator a
+        // second or two after the WS opens, so an earlier break would race the status flip and
+        // report Connecting even though the client is fine.
+        if (lastStatus == "Connected" && maxLines > 4 && maxRects > 0) break;
     }
 
     bool ok = frames > 0 && lastStatus == "Connected";
