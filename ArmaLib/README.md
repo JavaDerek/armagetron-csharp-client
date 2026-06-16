@@ -1,6 +1,6 @@
 # ArmaLib — a C# SDK for Armagetron Advanced
 
-`DotNetDevotee.ArmaLib.Lib` is a small, beginner-friendly .NET SDK for connecting to
+`DotNetDevotee.ArmaLib` is a small, beginner-friendly .NET SDK for connecting to
 [Armagetron Advanced](https://www.armagetronad.org/) `0.2.9.x` game servers. It hides the wire
 protocol (UDP framing, REAL number encoding, netobject-id reservation, the desc=311 priming
 sequence, dead-reckoning) behind one class so you can join a game, steer a lightcycle, and read the
@@ -13,7 +13,7 @@ dependencies, so there is nothing else to install.
 ## Install
 
 ```
-dotnet add package DotNetDevotee.ArmaLib.Lib
+dotnet add package DotNetDevotee.ArmaLib
 ```
 
 ## Quick start

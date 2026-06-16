@@ -19,7 +19,7 @@
        bundled into this package by the CopyProjectReferencesToPackage target, so consumers
        `dotnet add package DotNetDevotee.ArmaLib.Lib` and get everything with no extra packages. -->
   <PropertyGroup>
-    <PackageId>DotNetDevotee.ArmaLib.Lib</PackageId>
+    <PackageId>DotNetDevotee.ArmaLib</PackageId>
     <Version>0.1.0</Version>
     <Authors>Derek Ferguson</Authors>
     <Company>DotNetDevotee</Company>
