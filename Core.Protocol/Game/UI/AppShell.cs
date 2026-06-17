@@ -21,6 +21,7 @@ namespace Armagetron.Game.UI
         private readonly IUiClient _client;
         private readonly UiTheme _theme;
         private readonly bool _touchControls;
+        private readonly IConnectStore? _store;
 
         private readonly UiTextField _host, _port, _name;
         private string? _error;
@@ -53,17 +54,26 @@ namespace Armagetron.Game.UI
                                   || Screen == AppScreen.ConfirmLeave;
 
         public AppShell(IUiClient client, UiTheme theme,
-                        string host, int port, string name, bool touchControls = false)
+                        string host, int port, string name, bool touchControls = false,
+                        IConnectStore? store = null)
         {
             _client = client;
             _theme = theme;
             _touchControls = touchControls;
-            _host = new UiTextField("host", default, "SERVER ADDRESS") { Value = host, MaxLength = 40 };
-            _port = new UiTextField("port", default, "PORT") { Value = port.ToString(), Numeric = true, MaxLength = 5 };
-            _name = new UiTextField("name", default, "PLAYER NAME") { Value = name, MaxLength = 16 };
+            _store = store;
+            // A remembered choice (last successful connect) seeds the form over the head's baked
+            // defaults — heads now ship a BLANK host, so the store is what pre-fills a returning
+            // player's server. Nothing remembered (or no store) falls back to the passed defaults.
+            ConnectChoice? saved = store?.Load();
+            string h = saved?.Host ?? host;
+            int    p = saved?.Port ?? port;
+            string n = saved?.Name ?? name;
+            _host = new UiTextField("host", default, "SERVER ADDRESS") { Value = h, MaxLength = 40 };
+            _port = new UiTextField("port", default, "PORT") { Value = p.ToString(), Numeric = true, MaxLength = 5 };
+            _name = new UiTextField("name", default, "PLAYER NAME") { Value = n, MaxLength = 16 };
             // No field is focused at launch: on touch heads a focused field auto-opens the native
-            // keyboard, which would cover the connect screen before the user acts. With valid
-            // defaults they can tap CONNECT immediately, or tap a field to edit it.
+            // keyboard, which would cover the connect screen before the user acts. They can tap a
+            // field to edit it, then tap CONNECT.
         }
 
         // ── Per-frame ─────────────────────────────────────────────────────────────
@@ -110,6 +120,10 @@ namespace Armagetron.Game.UI
                 {
                     Screen = AppScreen.Playing; _error = null;
                     Sfx.Push(SfxId.ConnectOk);
+                    // Remember only what actually worked (trimmed to match the connect identity),
+                    // so next launch pre-fills this server/port/name.
+                    if (_store != null && int.TryParse(_port.Value, out int savedPort))
+                        _store.Save(new ConnectChoice(_host.Value.Trim(), savedPort, _name.Value.Trim()));
                 }
                 else if (_client.Status == ConnectionStatus.Failed)
                 {
@@ -381,6 +395,17 @@ namespace Armagetron.Game.UI
         public void RequestConnect()
         {
             if (Screen == AppScreen.Connect && IsFormValid()) StartConnect();
+        }
+
+        /// <summary>Prefill the connect form's host/port/name wholesale. Used by heads whose
+        /// shipped default is blank to set a concrete target before <see cref="RequestConnect"/>
+        /// (the iOS live-gate harness), and by the desktop head to make an explicit <c>--host</c>
+        /// win over a remembered choice.</summary>
+        public void PrefillConnect(string host, int port, string name)
+        {
+            _host.Value = host;
+            _port.Value = port.ToString();
+            _name.Value = name;
         }
 
         private void StartConnect()

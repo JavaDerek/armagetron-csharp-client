@@ -18,13 +18,18 @@ namespace Armagetron.iOS
     [Register("AppDelegate")]
     public class Program : UIApplicationDelegate
     {
-        // Defaults pre-fill the connect screen; the player can edit any field via the soft
-        // keyboard. Name is 'Vlad': the server currently rejects 'AaBot' with a Cheater() flag
-        // while 'Vlad' registers cleanly — same stopgap as the desktop & Android heads. See the
-        // registration_timing_race / registration_auth_research notes.
-        private const string Host = "192.168.68.61";
+        // The host ships BLANK (no baked-in server); a file store remembers the player's last
+        // server across launches and pre-fills it. Port/name keep placeholders the player can edit
+        // via the soft keyboard. Name is 'Vlad': the server currently rejects 'AaBot' with a
+        // Cheater() flag while 'Vlad' registers cleanly — same stopgap as the desktop & Android
+        // heads. See the registration_timing_race / registration_auth_research notes.
+        private const string Host = "";
         private const int    Port = 4534;
         private const string Name = "Vlad";
+
+        // The live-gate harness connects without a UI, so it needs a concrete target now that the
+        // shipped host is blank: the dev listen server. Used only on the AA_AUTOCONNECT path.
+        private const string HarnessHost = "192.168.68.61";
 
         private ArmagetronGame? _game;
 
@@ -37,14 +42,18 @@ namespace Armagetron.iOS
             string mediaRoot = Path.Combine(NSBundle.MainBundle.BundlePath, "media");
 
             var client = new UiArmaClient();
-            var shell  = new AppShell(client, UiTheme.Default, Host, Port, Name, touchControls: true);
+            var shell  = new AppShell(client, UiTheme.Default, Host, Port, Name, touchControls: true,
+                                      store: new FileConnectStore());
 
             // Live-server gate harness: with AA_AUTOCONNECT=1 (passed via
-            // SIMCTL_CHILD_AA_AUTOCONNECT on the simulator), skip the connect screen and register
-            // immediately, so register/render can be verified without synthesizing a tap. Normal
-            // launches (no env var) show the interactive connect screen unchanged.
+            // SIMCTL_CHILD_AA_AUTOCONNECT on the simulator), prefill the dev server (the shipped
+            // host is blank) and register immediately, so register/render can be verified without
+            // synthesizing a tap. Normal launches (no env var) show the connect screen unchanged.
             if (Environment.GetEnvironmentVariable("AA_AUTOCONNECT") == "1")
+            {
+                shell.PrefillConnect(HarnessHost, Port, Name);
                 shell.RequestConnect();
+            }
 
             _game = new ArmagetronGame(client, new IosShellInput(), shell,
                                        "Armagetron", fullscreen: true, mediaRoot: mediaRoot);

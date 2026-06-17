@@ -32,11 +32,12 @@ namespace Armagetron.Android
                              | ConfigChanges.KeyboardHidden)]
     public class Activity1 : AndroidGameActivity
     {
-        // Defaults pre-fill the connect screen; the player can edit any field via the soft
-        // keyboard. Name is 'Vlad': the server currently rejects 'AaBot' with a Cheater() flag
-        // while 'Vlad' registers cleanly — same stopgap as the desktop head. See the
+        // The host ships BLANK (no baked-in server); a file store remembers the player's last
+        // server across launches and pre-fills it. Port/name keep placeholders the player can edit
+        // via the soft keyboard. Name is 'Vlad': the server currently rejects 'AaBot' with a
+        // Cheater() flag while 'Vlad' registers cleanly — same stopgap as the desktop head. See the
         // registration_timing_race / registration_auth_research notes.
-        private const string Host = "192.168.68.61";
+        private const string Host = "";
         private const int    Port = 4534;
         private const string Name = "Vlad";
 
@@ -54,7 +55,8 @@ namespace Armagetron.Android
             UnpackAssetDir("media", FilesDir.AbsolutePath);
 
             var client = new UiArmaClient();
-            var shell  = new AppShell(client, UiTheme.Default, Host, Port, Name, touchControls: true);
+            var shell  = new AppShell(client, UiTheme.Default, Host, Port, Name, touchControls: true,
+                                      store: new FileConnectStore());
             _game = new ArmagetronGame(client, new AndroidShellInput(), shell,
                                        "Armagetron", fullscreen: true, mediaRoot: mediaRoot);
 

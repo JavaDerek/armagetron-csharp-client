@@ -2,20 +2,27 @@ using Armagetron.Game;
 using Armagetron.Game.UI;
 using Armagetron.Lib;
 
-// Defaults are pre-filled into the connect screen; --host/--port/--name override them.
-// Name default is 'Vlad': the server currently rejects 'AaBot' with a Cheater() flag (stale/
-// ghost session), while 'Vlad' registers cleanly — see registration-race notes. Override with
-// --name once 'AaBot' is clear server-side again.
-string host = "192.168.68.61";
+// The connect screen ships with a BLANK host (no baked-in server in the public repo); the file
+// store remembers the player's last server across launches. Port/name keep sensible placeholders.
+// --host/--port/--name still override. Name default is 'Vlad': the server currently rejects
+// 'AaBot' with a Cheater() flag (stale/ghost session), while 'Vlad' registers cleanly — see
+// registration-race notes. Override with --name once 'AaBot' is clear server-side again.
+string host = "";
 int    port = 4534;
 string name = "Vlad";
+bool   hostGiven = false;
 
 for (int i = 0; i < args.Length; i++)
 {
-    if (args[i] == "--host" && i + 1 < args.Length) host = args[++i];
+    if (args[i] == "--host" && i + 1 < args.Length) { host = args[++i]; hostGiven = true; }
     else if (args[i] == "--port" && i + 1 < args.Length) port = int.Parse(args[++i]);
     else if (args[i] == "--name" && i + 1 < args.Length) name = args[++i];
 }
+
+// The headless harness modes below (--selftest/--blankcheck) connect a probe directly with no UI,
+// so a blank host would leave them nowhere to go: fall back to the dev listen server when --host
+// is omitted. This fallback is dev-only and never seeds the shipped connect screen.
+string harnessHost = hostGiven ? host : "192.168.68.61";
 
 // Headless self-test (--selftest): exercise the real UiArmaClient connect path against a live
 // server WITHOUT opening a window, so the new adapter can be verified from a terminal (CLAUDE.md
@@ -23,8 +30,8 @@ for (int i = 0; i < args.Length; i++)
 if (System.Array.IndexOf(args, "--selftest") >= 0)
 {
     using var probe = new UiArmaClient();
-    System.Console.WriteLine($"[selftest] BeginConnect {host}:{port} as '{name}'");
-    probe.BeginConnect(host, port, name);
+    System.Console.WriteLine($"[selftest] BeginConnect {harnessHost}:{port} as '{name}'");
+    probe.BeginConnect(harnessHost, port, name);
     var sw = System.Diagnostics.Stopwatch.StartNew();
     while (probe.Status == ConnectionStatus.Connecting && sw.Elapsed.TotalSeconds < 50)
         System.Threading.Thread.Sleep(100);
@@ -49,8 +56,8 @@ if (System.Array.IndexOf(args, "--selftest") >= 0)
 if (System.Array.IndexOf(args, "--blankcheck") >= 0)
 {
     using var probe = new UiArmaClient();
-    System.Console.WriteLine($"[blankcheck] BeginConnect {host}:{port} as '{name}'");
-    probe.BeginConnect(host, port, name);
+    System.Console.WriteLine($"[blankcheck] BeginConnect {harnessHost}:{port} as '{name}'");
+    probe.BeginConnect(harnessHost, port, name);
     var sw = System.Diagnostics.Stopwatch.StartNew();
     while (probe.Status == ConnectionStatus.Connecting && sw.Elapsed.TotalSeconds < 50)
         System.Threading.Thread.Sleep(100);
@@ -92,7 +99,11 @@ if (System.Array.IndexOf(args, "--audition") >= 0)
 // window opens immediately at the connect form (no blocking pre-connect). Login, the desc=201
 // registration race, fresh-socket retry and the session loop all live inside UiArmaClient.
 var client = new UiArmaClient();
-var shell  = new AppShell(client, UiTheme.Default, host, port, name, touchControls: false);
+// Blank shipped default + a file store that remembers the last successful server across launches.
+var shell  = new AppShell(client, UiTheme.Default, host, port, name, touchControls: false,
+                          store: new FileConnectStore());
+// An explicit --host is a deliberate target for this run, so it wins over the remembered choice.
+if (hostGiven) shell.PrefillConnect(host, port, name);
 var input  = new DesktopShellInput();
 
 using var game = new ArmagetronGame(client, input, shell,
