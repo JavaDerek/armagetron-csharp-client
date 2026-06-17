@@ -141,7 +141,11 @@ namespace Armagetron.Game
             _sfx.PlayCues(_shell.Sfx.Drain(), _shell.Settings.Sound);
             _sfx.SetEngine(_shell.EngineRunning, _shell.Settings.Sound);
 
+#if !IOS
+            // Apple forbids programmatic termination (Game.Exit() is obsolete-as-error on iOS):
+            // there an exit request is a no-op — the user leaves via the home button/app switcher.
             if (_shell.ExitRequested) Exit();
+#endif
 
             base.Update(gameTime);
         }

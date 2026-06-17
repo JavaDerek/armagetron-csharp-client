@@ -23,10 +23,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The desktop client talks to the server ONLY through the ArmaLib facade; it no
-         longer references the session/protocol primitives directly. ArmaLib transitively
-         brings in Core.Protocol's render model (GameWorld snapshot, Scene, ArenaView). -->
+    <!-- The desktop client talks to the server through the ArmaLib facade, but it also
+         compile-links the shared render/host source (RenderingCode.props, ArmagetronGame)
+         which uses Core.Protocol types (Vec2, Scene, WorldScene, AppShell, …) directly.
+         ArmaLib bundles Core.Protocol with PrivateAssets="all" so those types do NOT flow
+         transitively to consumers — hence the explicit Core.Protocol reference here. -->
     <ProjectReference Include="..\ArmaLib\ArmaLib.csproj" />
+    <ProjectReference Include="..\Core.Protocol\Core.Protocol.csproj" />
   </ItemGroup>
 
   <!-- Shared TTF/texture/scene render glue + the designer's media files copied to output. -->

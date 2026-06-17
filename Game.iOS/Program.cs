@@ -27,7 +27,7 @@ namespace Armagetron.iOS
 
         private ArmagetronGame? _game;
 
-        public override bool FinishedLaunching(UIApplication application, NSDictionary launchOptions)
+        public override bool FinishedLaunching(UIApplication application, NSDictionary? launchOptions)
         {
             // An iOS .app bundle is a real, readable filesystem directory, and the designer media
             // ships inside it as BundleResource under media/… (see the .csproj). So — unlike

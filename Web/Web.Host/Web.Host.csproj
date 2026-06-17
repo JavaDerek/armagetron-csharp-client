@@ -14,7 +14,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- ArmaLib bundles Core.Protocol with PrivateAssets="all", so its types (Scene, RenderColor,
+         ConnectionStatus, SceneBuilder, …) do NOT flow transitively. This head uses them directly
+         to serialise frames, so it references Core.Protocol explicitly (matches Game.Desktop). -->
     <ProjectReference Include="..\..\ArmaLib\ArmaLib.csproj" />
+    <ProjectReference Include="..\..\Core.Protocol\Core.Protocol.csproj" />
   </ItemGroup>
 
 </Project>

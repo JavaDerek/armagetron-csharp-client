@@ -40,9 +40,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- iOS talks to the server only through ArmaLib, exactly like the desktop & Android heads;
-         ArmaLib transitively brings in Core.Protocol's render model + touch-input types. -->
+    <!-- iOS talks to the server through ArmaLib, but also compile-links the shared render/host
+         source which uses Core.Protocol types directly. ArmaLib bundles Core.Protocol with
+         PrivateAssets="all", so those types do NOT flow transitively to consumers — hence the
+         explicit Core.Protocol reference (matches Game.Desktop / Game.Android). -->
     <ProjectReference Include="..\ArmaLib\ArmaLib.csproj" />
+    <ProjectReference Include="..\Core.Protocol\Core.Protocol.csproj" />
   </ItemGroup>
 
   <!-- Same shared render glue the other heads compile (TextureStore, TextRenderer, SceneRenderer,

@@ -1,6 +1,11 @@
 using System;
 using System.IO;
 using Microsoft.Xna.Framework.Media;
+// On iOS the Apple SDK exposes a top-level `MediaPlayer` *namespace* that shadows MonoGame's
+// `Microsoft.Xna.Framework.Media.MediaPlayer` *class*, so unqualified `XnaMediaPlayer.Play(...)`
+// fails to compile there. Alias the XNA class so every head (desktop/Android/iOS) resolves it
+// unambiguously.
+using XnaMediaPlayer = Microsoft.Xna.Framework.Media.MediaPlayer;
 
 namespace Armagetron.Game.Audio
 {
@@ -8,7 +13,7 @@ namespace Armagetron.Game.Audio
     /// Background-music controller: loops one of two tracks from the asset pack depending on the
     /// app context — "01 - DMK" on the menu/connect screens, "02 - Asuncion" in-game — and honors
     /// the Settings Music toggle (silence when off). Driven once per frame from the host with the
-    /// current (musicOn, inGame) state; it only touches <see cref="MediaPlayer"/> when the desired
+    /// current (musicOn, inGame) state; it only touches <see cref="XnaMediaPlayer"/> when the desired
     /// track changes. Loading/playback failures (e.g. a headless box with no audio device) degrade
     /// to silence rather than crashing the game. SFX are not in the pack yet — hooks only.
     /// </summary>
@@ -68,7 +73,7 @@ namespace Armagetron.Game.Audio
             {
                 switch (want)
                 {
-                    case Track.None: MediaPlayer.Stop(); break;
+                    case Track.None: XnaMediaPlayer.Stop(); break;
                     case Track.Menu: Play(_menu); break;
                     case Track.Game: Play(_game); break;
                 }
@@ -81,15 +86,15 @@ namespace Armagetron.Game.Audio
 
         private static void Play(Song? song)
         {
-            if (song == null) { MediaPlayer.Stop(); return; }
-            MediaPlayer.IsRepeating = true;
-            MediaPlayer.Volume = 0.5f;
-            MediaPlayer.Play(song);
+            if (song == null) { XnaMediaPlayer.Stop(); return; }
+            XnaMediaPlayer.IsRepeating = true;
+            XnaMediaPlayer.Volume = 0.5f;
+            XnaMediaPlayer.Play(song);
         }
 
         public void Dispose()
         {
-            try { MediaPlayer.Stop(); } catch { /* no audio device */ }
+            try { XnaMediaPlayer.Stop(); } catch { /* no audio device */ }
             _menu?.Dispose();
             _game?.Dispose();
         }

@@ -11,7 +11,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- ArmaLib bundles Core.Net with PrivateAssets="all", so IUdpLink (the seam this transport
+         implements) does NOT flow transitively. Reference Core.Net explicitly. -->
     <ProjectReference Include="..\..\ArmaLib\ArmaLib.csproj" />
+    <ProjectReference Include="..\..\Core.Net\Core.Net.csproj" />
   </ItemGroup>
 
 </Project>
