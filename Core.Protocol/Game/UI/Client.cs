@@ -11,6 +11,9 @@ namespace Armagetron.Game.UI
         RoundStart,
         /// <summary>The current round ended.</summary>
         RoundEnd,
+        /// <summary>The local cycle (re)spawned and is now under our control — the authoritative
+        /// "we are alive" signal (from the client's Spawned/IsMine edge).</summary>
+        LocalSpawned,
         /// <summary>The local cycle crashed.</summary>
         LocalDied,
     }

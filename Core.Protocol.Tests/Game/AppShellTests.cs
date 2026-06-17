@@ -690,5 +690,42 @@ namespace Armagetron.Protocol.Tests.Game
             p.Tick(Array.Empty<CycleSnapshot>(), 100);
             Assert.False(p.EngineRunning);           // engine cuts when the local cycle dies
         }
+
+        [Fact]
+        public void EngineStaysSilent_WhileSpectatingAfterDeath_DespiteRoundFallback()
+        {
+            // Repro of the live iOS bug: after we crash and only spectate, the engine hum kept
+            // looping because the snapshot round-timer fallback (OnRoundStart) re-armed LocalAlive.
+            var c = new FakeUiClient { MyCycleId = 5 };
+            var s = Playing(c);
+
+            c.Snap = new[] { Cyc(5) };
+            s.Tick(c.Snap, 1_000);                       // our cycle spawns → round timer starts
+            c.Events.Enqueue(MatchEvent.LocalSpawned);
+            s.Tick(c.Snap, 1_100);
+            Assert.True(s.EngineRunning);                // alive → hum on
+
+            c.Events.Enqueue(MatchEvent.LocalDied);
+            s.Tick(c.Snap, 2_000);                       // we crash
+            Assert.False(s.EngineRunning);
+
+            // Round ends; our cycle is wiped; we are eliminated and now only spectate.
+            c.Events.Enqueue(MatchEvent.RoundEnd);
+            c.Snap = Array.Empty<CycleSnapshot>();
+            s.Tick(c.Snap, 3_000);
+
+            // A stale local id flickers back into a later snapshot (no real respawn, no LocalSpawned).
+            // The timer fallback may restart the round clock, but the engine must STAY silent.
+            c.Snap = new[] { Cyc(5) };
+            s.Tick(c.Snap, 4_000);
+            Assert.True(s.Match.RoundActive);            // fallback still drives the HUD timer
+            Assert.False(s.Match.LocalAlive);            // …but does not resurrect aliveness
+            Assert.False(s.EngineRunning);               // ← was true (the looping-hum bug)
+
+            // A genuine respawn (LocalSpawned) is what brings the engine back.
+            c.Events.Enqueue(MatchEvent.LocalSpawned);
+            s.Tick(c.Snap, 4_100);
+            Assert.True(s.EngineRunning);
+        }
     }
 }

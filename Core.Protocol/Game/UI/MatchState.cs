@@ -18,7 +18,10 @@ namespace Armagetron.Game.UI
         /// <summary>True between RoundStarted and RoundEnded.</summary>
         public bool RoundActive { get; private set; }
 
-        /// <summary>True while the local cycle is alive this round.</summary>
+        /// <summary>True while the local cycle is alive. Driven ONLY by the authoritative
+        /// spawn/death edges (<see cref="OnLocalSpawned"/> / <see cref="OnLocalDied"/>), never by
+        /// round start — otherwise a spectator (eliminated, never respawning) would be wrongly
+        /// marked alive and the engine hum would loop forever.</summary>
         public bool LocalAlive { get; private set; } = true;
 
         /// <summary>Number of cycles currently in the snapshot (all players seen).</summary>
@@ -31,10 +34,11 @@ namespace Armagetron.Game.UI
             RoundNumber++;
             _roundStartMs = nowMs;
             RoundActive = true;
-            LocalAlive = true;
         }
 
         public void OnRoundEnd() => RoundActive = false;
+
+        public void OnLocalSpawned() => LocalAlive = true;
 
         public void OnLocalDied() => LocalAlive = false;
 

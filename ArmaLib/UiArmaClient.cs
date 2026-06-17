@@ -38,6 +38,7 @@ namespace Armagetron.Lib
             _client = client;
             _client.RoundStarted += (_, _) => Enqueue(MatchEvent.RoundStart);
             _client.RoundEnded   += (_, _) => Enqueue(MatchEvent.RoundEnd);
+            _client.Spawned      += (_, e) => { if (e.IsMine) Enqueue(MatchEvent.LocalSpawned); };
             _client.Died         += (_, e) => { if (e.IsMine) Enqueue(MatchEvent.LocalDied); };
         }
 

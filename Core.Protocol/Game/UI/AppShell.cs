@@ -89,6 +89,11 @@ namespace Armagetron.Game.UI
                         Match.OnRoundEnd();
                         _toasts.Push("ROUND OVER", _theme.Text, nowMs);
                         break;
+                    case MatchEvent.LocalSpawned:
+                        // Authoritative "we're alive" edge — the only thing that re-arms the engine
+                        // hum (round start does not, so a spectator stays silent).
+                        Match.OnLocalSpawned();
+                        break;
                     case MatchEvent.LocalDied:
                         Match.OnLocalDied();
                         Sfx.Push(SfxId.Explosion);
@@ -137,6 +142,7 @@ namespace Armagetron.Game.UI
 
         public void OnRoundStart(long nowMs) => Match.OnRoundStart(nowMs);
         public void OnRoundEnd() => Match.OnRoundEnd();
+        public void OnLocalSpawned() => Match.OnLocalSpawned();
         public void OnLocalDied() => Match.OnLocalDied();
 
         // ── Input ─────────────────────────────────────────────────────────────────

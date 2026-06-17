@@ -17,16 +17,31 @@ namespace Armagetron.Protocol.Tests.Game
         }
 
         [Fact]
-        public void OnRoundStart_IncrementsRound_SetsActiveAndAlive()
+        public void OnRoundStart_IncrementsRound_SetsActive_DoesNotResurrectAlive()
         {
             var m = new MatchState();
             m.OnLocalDied();
             m.OnRoundStart(1_000);
             Assert.Equal(1, m.RoundNumber);
             Assert.True(m.RoundActive);
-            Assert.True(m.LocalAlive);          // reset on new round
+            // Round start alone must NOT make us alive — otherwise a spectator (eliminated, never
+            // respawning) is wrongly marked alive and the engine hum loops forever. Aliveness comes
+            // only from the authoritative spawn/death edges below.
+            Assert.False(m.LocalAlive);
             m.OnRoundStart(5_000);
             Assert.Equal(2, m.RoundNumber);
+        }
+
+        [Fact]
+        public void OnLocalSpawned_SetsAlive_OnLocalDied_ClearsIt()
+        {
+            var m = new MatchState();
+            m.OnLocalDied();
+            Assert.False(m.LocalAlive);
+            m.OnLocalSpawned();
+            Assert.True(m.LocalAlive);          // respawn brings the engine back
+            m.OnLocalDied();
+            Assert.False(m.LocalAlive);         // and a fresh crash silences it again
         }
 
         [Fact]
