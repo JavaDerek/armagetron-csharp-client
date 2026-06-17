@@ -1,0 +1,56 @@
+name: Release drift
+
+# Guards against shipping ArmaLib improvements without publishing them: if the package's source
+# (ArmaLib + the bundled Core.Protocol + Core.Net) has changed since the last released v* tag but
+# the <Version> wasn't bumped, this fails with an actionable message. Keeps NuGet consumers (e.g.
+# bot builders on `dotnet add package DotNetDevotee.ArmaLib`) from silently getting a stale binary.
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # need full history + tags to diff against the last release
+
+      - name: Check the published package is in sync with shipped source
+        run: |
+          set -euo pipefail
+          tag=$(git tag -l 'v*' | sort -V | tail -1)
+          if [ -z "$tag" ]; then echo "No v* release tag yet — nothing to check."; exit 0; fi
+          released=${tag#v}
+          current=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' ArmaLib/ArmaLib.csproj | head -1)
+          echo "Latest released tag: $tag (version $released)"
+          echo "Current ArmaLib <Version>: $current"
+
+          # Shipped inputs = the three projects bundled into the package. Docs and build output don't ship.
+          changed=$(git diff --name-only "$tag" HEAD -- ArmaLib Core.Protocol Core.Net \
+                      ':!**/bin/**' ':!**/obj/**' ':!**/*.md' || true)
+          if [ -z "$changed" ]; then
+            echo "✅ No shipped ArmaLib/Core source changed since $tag — package is in sync."
+            exit 0
+          fi
+          echo "Shipped source changed since $tag:"
+          echo "$changed" | sed 's/^/  - /'
+
+          highest=$(printf '%s\n%s\n' "$released" "$current" | sort -V | tail -1)
+          if [ "$current" = "$released" ]; then
+            echo "::error::ArmaLib's shipped code (ArmaLib / Core.Protocol / Core.Net) changed since $tag, but <Version> is still $current. Bump <Version> in ArmaLib/ArmaLib.csproj, then 'git tag vX.Y.Z && git push origin vX.Y.Z' to publish so NuGet consumers get the change."
+            exit 1
+          elif [ "$highest" != "$current" ]; then
+            echo "::error::<Version> ($current) is lower than the latest released tag ($released). Fix <Version> in ArmaLib/ArmaLib.csproj."
+            exit 1
+          elif [ -z "$(git tag -l "v$current")" ]; then
+            echo "::warning::<Version> is bumped to $current (good), but there's no tag v$current yet — run 'git tag v$current && git push origin v$current' to publish it to NuGet."
+            exit 0
+          else
+            echo "✅ Version $current is bumped past $released and tagged — in sync."
+            exit 0
+          fi

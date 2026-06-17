@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Keep the GitHub Actions used by ci.yml / publish.yml / release-drift.yml current (e.g. so the
+  # Node-runtime deprecations don't pile up). Dependabot opens a PR when a newer major/minor lands.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]
