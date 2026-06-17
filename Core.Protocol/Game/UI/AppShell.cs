@@ -61,7 +61,9 @@ namespace Armagetron.Game.UI
             _host = new UiTextField("host", default, "SERVER ADDRESS") { Value = host, MaxLength = 40 };
             _port = new UiTextField("port", default, "PORT") { Value = port.ToString(), Numeric = true, MaxLength = 5 };
             _name = new UiTextField("name", default, "PLAYER NAME") { Value = name, MaxLength = 16 };
-            _host.Focused = true;
+            // No field is focused at launch: on touch heads a focused field auto-opens the native
+            // keyboard, which would cover the connect screen before the user acts. With valid
+            // defaults they can tap CONNECT immediately, or tap a field to edit it.
         }
 
         // ── Per-frame ─────────────────────────────────────────────────────────────

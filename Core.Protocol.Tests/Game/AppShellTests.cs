@@ -61,6 +61,16 @@ namespace Armagetron.Protocol.Tests.Game
         }
 
         [Fact]
+        public void Starts_WithNoFieldFocused_SoTouchHeadsDontAutoPopTheKeyboard()
+        {
+            // On touch heads a focused field triggers the native soft keyboard. If a field were
+            // focused at launch the EDIT dialog would pop over the connect screen before the user
+            // does anything; with valid defaults they should be able to just tap CONNECT.
+            var s = Shell(new FakeUiClient());
+            Assert.Null(s.FocusedFieldId);
+        }
+
+        [Fact]
         public void TappingConnect_WithValidForm_BeginsConnect_AndGoesConnecting()
         {
             var c = new FakeUiClient();
