@@ -14,10 +14,25 @@ Launched on iOS 26.5 (iPhone 17 Pro sim). Confirmed via screenshot + `simctl`/`l
 - **#2 Soft keyboard ✅** — `KeyboardInput.Show` pops the iOS soft keyboard for the connect fields.
 - **#3 Audio ✅** — iOS `AVPlayer`/`URLAsset` loads the bundled `.ogg` music with no errors (the
   plain file-path play path; no Android-style OpenFd workaround needed).
-- **#4 Orientation/safe-area ⏳** — content renders landscape; notch/safe-area insets not yet
-  eyeballed on a notched device.
-- **#5 Live-server gate ⏳** — needs the `0.2.9.3.0` server up plus a CONNECT tap (simctl has no
-  tap primitive); register/render/turns over `.61:4534` not yet exercised from the simulator.
+- **#4 Orientation/safe-area ⏳** — content renders landscape and the HUD lays out correctly;
+  notch/safe-area insets not yet specifically tuned on a notched device.
+- **#5 Live-server gate ✅** — registered on `192.168.68.61:4534` and rendered a live match from the
+  iOS binary: 4 opponent cycles with trails, live HUD (ROUND/STANDINGS/timer/LIVE), and the
+  crash→ELIMINATED→spectate path. The log shows the real decode (`desc=24` position syncs for
+  cid 5352/5353/5354, `game_time`) and breaking through the server's `desc=3` name-gate. Driven
+  headlessly via the `AA_AUTOCONNECT=1` env seam (see below) since simctl has no tap primitive;
+  tap-to-turn while alive was not exercised (we joined mid-round and crashed on spawn) but the
+  touch path is the unit-tested `TapTurnDecider` + the same `TouchPanel`/`UiArmaClient` code live
+  on Android/desktop.
+
+### Auto-connect live-gate seam
+`Game.iOS/Program.cs` calls `AppShell.RequestConnect()` when `AA_AUTOCONNECT=1`, so the connect
+screen is skipped and the client registers immediately — letting the live gate run without a
+synthesized tap. Launch it on the simulator with:
+```bash
+SIMCTL_CHILD_AA_AUTOCONNECT=1 xcrun simctl launch "$UDID" com.armagetron.client
+```
+Normal launches (no env var) show the interactive connect screen unchanged.
 
 Three fixes were needed to take it from scaffold to running (all on 2026-06-16):
 1. **Explicit `Core.Protocol` reference** (also added to Desktop/Android/RenderHarness/Web) — ArmaLib

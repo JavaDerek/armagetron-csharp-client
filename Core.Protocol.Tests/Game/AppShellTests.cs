@@ -105,6 +105,31 @@ namespace Armagetron.Protocol.Tests.Game
             Assert.Equal("Vla", s.PlayerName);
         }
 
+        [Fact]
+        public void RequestConnect_WithValidForm_BeginsConnect_AndGoesConnecting()
+        {
+            // The automation/live-gate seam (used by heads that cannot synthesize a tap, e.g. the
+            // iOS simulator harness) must do exactly what tapping CONNECT does.
+            var c = new FakeUiClient();
+            var s = Shell(c);
+            s.RequestConnect();
+            Assert.Equal(1, c.BeginConnects);
+            Assert.Equal("192.168.68.61", c.ConnHost);
+            Assert.Equal(4534, c.ConnPort);
+            Assert.Equal("AaBot", c.ConnName);
+            Assert.Equal(AppScreen.Connecting, s.Screen);
+        }
+
+        [Fact]
+        public void RequestConnect_IsNoOp_WhenNotOnConnectScreen()
+        {
+            var c = new FakeUiClient();
+            var s = Shell(c);
+            s.RequestConnect();   // -> Connecting
+            s.RequestConnect();   // already past the connect form: no second BeginConnect
+            Assert.Equal(1, c.BeginConnects);
+        }
+
         // ── Connecting → Playing / failure ─────────────────────────────────────────
 
         [Fact]

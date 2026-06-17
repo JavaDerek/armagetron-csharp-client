@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using Foundation;
 using UIKit;
@@ -37,6 +38,14 @@ namespace Armagetron.iOS
 
             var client = new UiArmaClient();
             var shell  = new AppShell(client, UiTheme.Default, Host, Port, Name, touchControls: true);
+
+            // Live-server gate harness: with AA_AUTOCONNECT=1 (passed via
+            // SIMCTL_CHILD_AA_AUTOCONNECT on the simulator), skip the connect screen and register
+            // immediately, so register/render can be verified without synthesizing a tap. Normal
+            // launches (no env var) show the interactive connect screen unchanged.
+            if (Environment.GetEnvironmentVariable("AA_AUTOCONNECT") == "1")
+                shell.RequestConnect();
+
             _game = new ArmagetronGame(client, new IosShellInput(), shell,
                                        "Armagetron", fullscreen: true, mediaRoot: mediaRoot);
             _game.Run();

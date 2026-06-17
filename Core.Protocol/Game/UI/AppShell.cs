@@ -366,6 +366,15 @@ namespace Armagetron.Game.UI
             && !string.IsNullOrWhiteSpace(_name.Value)
             && int.TryParse(_port.Value, out int p) && p >= 1 && p <= 65535;
 
+        /// <summary>Automation/live-gate seam: programmatically perform the same action as tapping
+        /// CONNECT (begin connecting with the current form values, advance to the Connecting screen),
+        /// for heads that cannot synthesize a tap — e.g. the iOS simulator live-server harness driven
+        /// by an env var. No-op unless we're on the connect form with a valid form.</summary>
+        public void RequestConnect()
+        {
+            if (Screen == AppScreen.Connect && IsFormValid()) StartConnect();
+        }
+
         private void StartConnect()
         {
             int port = int.Parse(_port.Value);

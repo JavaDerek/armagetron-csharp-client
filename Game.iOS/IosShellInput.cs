@@ -49,7 +49,10 @@ namespace Armagetron.iOS
                 if (_result != null) shell.SetFocusedFieldValue(_result);
             }
 
-            string? field = shell.FocusedFieldId;
+            // Only the connect form has editable fields; never pop the native keyboard once we've
+            // left it (e.g. a field left focused while Connecting/Playing — including the
+            // auto-connect live-gate path, which would otherwise open EDIT HOST over the arena).
+            string? field = shell.Screen == AppScreen.Connect ? shell.FocusedFieldId : null;
             if (field == null) { _editingFieldId = null; return; }
 
             // A freshly-focused field opens the keyboard once.
